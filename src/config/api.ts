@@ -4,13 +4,13 @@ import { Platform } from 'react-native';
  * Configuración centralizada de la API.
  */
 export const API_CONFIG = {
-  // URL del proxy server desplegado (RENDER)
+  // URL del backend separado en Render
   PRODUCTION_API_URL: 'https://salimos.onrender.com',
 
-  // URL local para desarrollo
-  LOCAL_API_URL: 'http://localhost:8082',
+  // URL local para Android emulator / backend local
+  LOCAL_API_URL: 'http://10.0.2.2:8082',
 
-  // Puerto del proxy local
+  // Puerto del backend local
   LOCAL_PORT: 8082,
 
   // Host base de la API externa de Fourvenues (sin path)
@@ -43,12 +43,13 @@ export function getApiBaseUrls(): string[] {
   } else {
     // Dispositivos móviles (Android/iOS)
     if (API_CONFIG.isProduction) {
-      // APK producción → API directa de Fourvenues (funciona sin proxy)
-      urls.push(API_CONFIG.FOURVENUES_BASE_URL);
+      // APK producción → API pública del backend separado
       urls.push(API_CONFIG.PRODUCTION_API_URL);
+      urls.push(API_CONFIG.FOURVENUES_BASE_URL);
     } else {
-      // Desarrollo → proxy local, fallback API directa
-      urls.push(`http://localhost:${API_CONFIG.LOCAL_PORT}`);
+      // Desarrollo móvil → backend separado en el emulador o la IP local
+      urls.push(API_CONFIG.LOCAL_API_URL);
+      urls.push(API_CONFIG.PRODUCTION_API_URL);
       urls.push(API_CONFIG.FOURVENUES_BASE_URL);
     }
   }

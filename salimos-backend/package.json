@@ -1,0 +1,10 @@
+{
+  "name": "salimos-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "python main.py",
+    "dev": "python main.py",
+    "install:python": "pip install -r requirements.txt"
+  }
+}
