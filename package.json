@@ -1,7 +1,7 @@
 {
   "name": "aplicacionmovildiscotecas",
   "version": "1.0.0",
-  "main": "index.ts",
+  "main": "proxy-server.js",
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
     "@react-navigation/bottom-tabs": "^7.18.16",
@@ -27,11 +27,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
-    "start": "expo start",
+    "start": "node proxy-server.js",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "proxy": "node proxy-server.js"
+    "proxy": "node proxy-server.js",
+    "expo": "expo start"
   },
   "private": true
 }
