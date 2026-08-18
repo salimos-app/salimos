@@ -5,7 +5,7 @@ import { Platform } from 'react-native';
  */
 export const API_CONFIG = {
   // URL del proxy server desplegado (RENDER)
-  PRODUCTION_API_URL: 'https://nightspot-proxy.onrender.com',
+  PRODUCTION_API_URL: 'https://salimos.onrender.com',
 
   // URL local para desarrollo
   LOCAL_API_URL: 'http://localhost:8082',

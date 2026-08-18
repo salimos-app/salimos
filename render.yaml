@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: nightspot-proxy
+    name: salimos
     runtime: node
     plan: free
     buildCommand: npm install

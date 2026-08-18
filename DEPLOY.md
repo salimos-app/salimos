@@ -45,14 +45,14 @@ npx expo run:android --variant release
 
 | Campo | Valor |
 |-------|-------|
-| Name | `nightspot-proxy` |
+| Name | `salimos` |
 | Runtime | `Node` |
 | Build Command | `npm install` |
 | Start Command | `node proxy-server.js` |
 | Auto-Deploy | Sí |
 
 6. Después del despliegue, obtendrás una URL pública como:
-   `https://nightspot-proxy.onrender.com`
+   `https://salimos.onrender.com`
 
 ### Opción B: Railway.app (Gratis)
 1. Ve a `railway.app`
@@ -82,7 +82,7 @@ Después de desplegar el proxy, actualiza `src/config/api.ts`:
 
 ```typescript
 export const API_CONFIG = {
-  PRODUCTION_API_URL: 'https://TU-URL-DESPLIEGUE.onrender.com',
+  PRODUCTION_API_URL: 'https://salimos.onrender.com',
   // ...resto igual
 };
 ```
