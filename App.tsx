@@ -32,7 +32,6 @@ export default function App() {
   // Inicializa con los datos locales para que la app se muestre al instante
   const [bananaCoords, setBananaCoords] = useState<DiscotecaCoordinates>(defaultBananaCoords);
   const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(defaultGuatequeCoords);
-  const [loading, setLoading] = useState(false);
 
   const selectedClub = selectedMarkerSlug
     ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
@@ -40,15 +39,9 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
-    let timeoutId: ReturnType<typeof setTimeout>;
 
     const loadCoordinates = async () => {
       try {
-        // Timeout de 5 segundos máximo para no bloquear la pantalla
-        timeoutId = setTimeout(() => {
-          if (mounted) setLoading(false);
-        }, 5000);
-
         const [bananaData, guatequeData] = await Promise.all([
           fetchDiscotecaCoordinates('banana'),
           fetchDiscotecaCoordinates('guateque'),
@@ -61,10 +54,7 @@ export default function App() {
         console.warn('Error cargando coordenadas (usando datos locales):', error);
         // Ya están los datos locales por defecto
       } finally {
-        if (mounted) {
-          clearTimeout(timeoutId);
-          setLoading(false);
-        }
+        // La vista usa las coordenadas locales mientras la API responde.
       }
     };
 
@@ -72,7 +62,6 @@ export default function App() {
 
     return () => {
       mounted = false;
-      clearTimeout(timeoutId);
     };
   }, []);
 
@@ -100,15 +89,6 @@ export default function App() {
       <View style={styles.container}>
         <StatusBar style="light" />
         <EventosScreen discoteca={selectedDiscoteca} onBack={handleBack} />
-      </View>
-    );
-  }
-
-  if (loading || !bananaCoords) {
-    return (
-      <View style={[styles.container, styles.centerContent]}>
-        <ActivityIndicator size="large" color={colors.neonPink} />
-        <Text style={styles.loadingText}>Cargando discotecas...</Text>
       </View>
     );
   }

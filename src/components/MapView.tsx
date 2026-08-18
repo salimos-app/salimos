@@ -1,16 +1,8 @@
 import React from 'react';
-import { Platform, View, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Platform, View, StyleSheet } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { Region, Discoteca } from '../types/discoteca';
 import DiscotecaMarker from './DiscotecaMarker';
-
-// Importar react-native-maps solo en plataformas nativas
-let RNMapView: any = null;
-let RNMarker: any = null;
-if (Platform.OS !== 'web') {
-  const Maps = require('react-native-maps');
-  RNMapView = Maps.default;
-  RNMarker = Maps.Marker;
-}
 
 interface MarkerProps {
   coordinate: { latitude: number; longitude: number };
@@ -145,17 +137,50 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
     );
   }
 
+  const markers = React.Children.toArray(children).filter((child: any) => {
+    return React.isValidElement(child) && Boolean((child as React.ReactElement<MarkerProps>).props.coordinate);
+  }) as React.ReactElement<MarkerProps>[];
+  const center = region || initialRegion;
+  const markerData = markers.map((marker, index) => ({
+    index,
+    latitude: marker.props.coordinate.latitude,
+    longitude: marker.props.coordinate.longitude,
+    title: marker.props.title ?? 'Discoteca',
+    color: marker.props.discoteca?.color ?? '#ff4d4d',
+    selected: Boolean(marker.props.selected),
+  }));
+  const mapHtml = `<!doctype html>
+<html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>html,body,#map{height:100%;margin:0;background:#dfe8f6} .club{border:2px solid #fff;border-radius:14px;padding:7px 9px;background:rgba(12,10,22,.94);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}</style></head>
+<body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
+const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
+const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+'">'+item.title+'</div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
+map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
+</script></body></html>`;
+
   return (
-    <RNMapView
+    <WebView
       style={style}
-      initialRegion={initialRegion}
-      region={region}
-      onRegionChangeComplete={onRegionChangeComplete}
-      onPress={onPress}
-      customMapStyle={customMapStyle}
-    >
-      {children}
-    </RNMapView>
+      originWhitelist={['*']}
+      javaScriptEnabled
+      domStorageEnabled
+      source={{ html: mapHtml }}
+      onMessage={(event) => {
+        try {
+          const message = JSON.parse(event.nativeEvent.data);
+          if (message.type === 'marker' && markers[message.index]?.props.onPress) {
+            markers[message.index].props.onPress?.();
+          } else if (message.type === 'map') {
+            onPress?.();
+          }
+        } catch {
+          // Ignora mensajes inválidos del mapa.
+        }
+      }}
+    />
   );
 }
 
@@ -164,18 +189,7 @@ export function MarkerComponent({ coordinate, title, pinColor, onPress, children
     return <>{children}</>;
   }
 
-  return (
-    <RNMarker
-      coordinate={coordinate}
-      title={title}
-      pinColor={pinColor}
-      onPress={onPress}
-      tracksViewChanges={tracksViewChanges}
-      selected={selected}
-    >
-      {children}
-    </RNMarker>
-  );
+  return null;
 }
 
 const styles = StyleSheet.create({
