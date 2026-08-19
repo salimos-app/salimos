@@ -152,12 +152,12 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
   const mapHtml = `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club-wrap{width:104px;height:78px;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;overflow:visible}.club-pin{width:44px;height:44px;box-sizing:border-box;border:3px solid #fff;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font:bold 17px sans-serif;box-shadow:0 4px 12px #0008;position:relative}.club-pin:after{content:'';position:absolute;width:14px;height:14px;bottom:-8px;background:inherit;transform:rotate(45deg);border-right:3px solid #fff;border-bottom:3px solid #fff;z-index:-1}.club-label{margin-top:8px;max-width:104px;padding:4px 7px;border-radius:7px;background:rgba(12,10,22,.94);color:#fff;font:bold 11px sans-serif;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 3px 8px #0008}</style></head>
+<style>html,body,#map{height:100%;margin:0;background:#dfe8f6} .club{display:inline-block;transform:translateX(-50%);border:2px solid #fff;border-radius:14px;padding:7px 9px;background:rgba(12,10,22,.94);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}</style></head>
 <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
 const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-markers.forEach(item=>{const initial=item.title.charAt(0).toUpperCase();const icon=L.divIcon({className:'',html:'<div class="club-wrap"><div class="club-pin" style="background:'+item.color+'">'+initial+'</div><div class="club-label">'+item.title+'</div></div>',iconSize:[104,78],iconAnchor:[52,78],popupAnchor:[0,-78]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
+markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+'">'+item.title+'</div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
 map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
 </script></body></html>`;
 
