@@ -147,17 +147,18 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
     longitude: marker.props.coordinate.longitude,
     title: marker.props.title ?? 'Discoteca',
     color: marker.props.discoteca?.color ?? '#ff4d4d',
+    image: marker.props.discoteca?.imagen ?? 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
     selected: Boolean(marker.props.selected),
   }));
   const mapHtml = `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>html,body,#map{height:100%;margin:0;background:#dfe8f6} .club{display:inline-block;transform:translateX(-50%);border:2px solid #fff;border-radius:14px;padding:7px 9px;background:rgba(12,10,22,.94);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}</style></head>
+<style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}.club-image{width:100%;height:32px;background-position:center;background-size:cover}.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}</style></head>
 <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
 const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
-markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+'">'+item.title+'</div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
+markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+';--club-color:'+item.color+'"><div class="club-image" style="background-image:url(&quot;'+item.image+'&quot;)" ></div><div class="club-name">'+item.title+'</div></div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
 map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
 </script></body></html>`;
 
