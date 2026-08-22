@@ -2,9 +2,16 @@
   "name": "salimos-backend",
   "version": "1.0.0",
   "private": true,
+  "description": "Backend proxy de Salimos hacia la API de Fourvenues",
+  "main": "src/server.js",
   "scripts": {
-    "start": "python main.py",
-    "dev": "python main.py",
-    "install:python": "pip install -r requirements.txt"
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "morgan": "^1.11.0"
   }
 }

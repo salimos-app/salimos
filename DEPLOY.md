@@ -1,7 +1,8 @@
-# Guía de Despliegue - NightSpot App
+# Guía de Despliegue - Salimos
 
 ## Construye el APK
-¡Para compilar tu propio APK de NightSpot, haz clic aquí! → **[CREAR MI APK](https://expo.dev/accounts/_/projects/nightspot/builds)**
+
+¡Para compilar tu propio APK de Salimos, haz clic aquí! → **[CREAR MI APK](https://expo.dev/accounts/_/projects/salimos/builds)**
 
 ---
 
@@ -22,7 +23,7 @@ npx eas init
 npx eas build --platform android --profile preview
 ```
 
-> ⚠️ EAS Build requiere y tiene una cuenta gratuita de Expo. La build se ejecuta en la nube.
+> ⚠️ EAS Build requiere una cuenta gratuita de Expo. La build se ejecuta en la nube.
 
 ### Alternativa: APK local (sin EAS)
 ```bash
@@ -34,51 +35,32 @@ npx expo run:android --variant release
 
 ---
 
-## 2. Desplegar el Proxy Server (para acceso externo)
+## 2. Desplegar el backend (para acceso externo)
+
+El backend vive en [`salimos-backend/`](salimos-backend/) y es un servicio Node/Express
+independiente de la app Expo (ver su [README](salimos-backend/README.md)).
 
 ### Opción A: Render.com (Gratis)
 1. Ve a https://render.com y crea una cuenta
 2. Sube este proyecto a GitHub
-3. En Render, crea un "New Web Service"
-4. Conecta tu repo de GitHub
-5. Configura:
-
-| Campo | Valor |
-|-------|-------|
-| Name | `salimos` |
-| Runtime | `Node` |
-| Build Command | `npm install` |
-| Start Command | `node proxy-server.js` |
-| Auto-Deploy | Sí |
-
-6. Después del despliegue, obtendrás una URL pública como:
+3. En Render, crea un "New Web Service" a partir del repo (usa el `render.yaml` incluido,
+   que ya apunta a `salimos-backend/` como `rootDir`)
+4. Define la variable de entorno `FOURVENUES_API_TOKEN` en el panel de Render (no está
+   en el repo por seguridad)
+5. Después del despliegue, obtendrás una URL pública como:
    `https://salimos.onrender.com`
 
 ### Opción B: Railway.app (Gratis)
 1. Ve a `railway.app`
-2. New Project → Deploy from Button
-3. Selecciona tu repo de GitHub
-4. Railway detecta automáticamente Node y despliega
-
-### Opción C: Vercel (Servidorless)
-```json
-// vercel.json
-{
-  "version": 2,
-  "builds": [
-    { "src": "proxy-server.js", "use": "@vercel/node" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "proxy-server.js" }
-  ]
-}
-```
+2. New Project → Deploy from GitHub
+3. Selecciona tu repo, configura `salimos-backend` como directorio raíz del servicio
+4. Define `FOURVENUES_API_TOKEN` en las variables de entorno
 
 ---
 
 ## 3. Actualizar la URL de producción
 
-Después de desplegar el proxy, actualiza `src/config/api.ts`:
+Después de desplegar el backend, actualiza `src/config/api.ts`:
 
 ```typescript
 export const API_CONFIG = {
@@ -117,23 +99,23 @@ npx expo start --web
 
 ```
 ┌────────────────────────────┐
-│ 1. Desplegar Proxy Server │
-│    (Render.com)           │
+│ 1. Desplegar backend Node  │
+│    (Render.com)            │
 └─────────┬──────────────────┘
           ↓
 ┌────────────────────────────┐
-│ 2. Actualizar api.ts       │
-│    PRODUCTION_API_URL      │
+│ 2. Actualizar api.ts        │
+│    PRODUCTION_API_URL       │
 └─────────┬──────────────────┘
           ↓
 ┌────────────────────────────┐
-│ 3. Generar APK            │
-│    eas build --platform   │
+│ 3. Generar APK              │
+│    eas build --platform     │
 └─────────┬──────────────────┘
           ↓
 ┌────────────────────────────┐
-│ 4. Distribir APK          │
-│    WhatsApp / Drive / Play │
+│ 4. Distribuir APK           │
+│    WhatsApp / Drive / Play  │
 └────────────────────────────┘
 ```
 
@@ -144,7 +126,7 @@ npx expo start --web
 | Problema | Solución |
 |----------|----------|
 | EAS Build falla | `npx eas build:configure` y reintenta |
-| App no conecta al API | Ver más la URL en `src/config/api.ts` |
-| CORS error | Asegúrate que proxy-server.js incluya CORS headers |
+| App no conecta al API | Revisa la URL en `src/config/api.ts` |
+| CORS error | Asegúrate que `salimos-backend/src/server.js` incluya los headers CORS |
 | APK no instala | Permite "instalar de fuentes desconocidas" |
-| Proxy no responde | Verifica que el log muestre el puerto correcto |
+| Backend no responde | Verifica que `FOURVENUES_API_TOKEN` esté configurado y el log muestre el puerto correcto |

@@ -3,10 +3,15 @@ services:
     name: salimos
     runtime: node
     plan: free
+    rootDir: salimos-backend
     buildCommand: npm install
-    startCommand: node proxy-server.js
+    startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: FOURVENUES_API_HOST
+        value: cli-api-service.fourvenues.com
+      - key: FOURVENUES_API_TOKEN
+        sync: false

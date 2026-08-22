@@ -1,20 +1,31 @@
 # Salimos Backend
 
-Backend separado para la app de discotecas.
+Backend Node/Express que actúa de proxy hacia la API de Fourvenues, para que la
+app móvil no tenga que guardar el token de autenticación en el bundle.
 
-## Arrancar
+## Arrancar en local
 
 ```bash
+cd salimos-backend
 npm install
-npm start
+cp .env.example .env   # y completa FOURVENUES_API_TOKEN
+npm run dev
 ```
 
-El servicio escucha en el puerto 8082 y expone:
+El servicio escucha por defecto en el puerto `8082` y expone:
 
-- http://localhost:8082/api/health
-- http://localhost:8082/api/microsites/:slug/metadata
+- `GET /api/health`
+- `GET /api/microsites/:slug/metadata`
+
+## Variables de entorno
+
+| Variable | Descripción | Default |
+|---|---|---|
+| `PORT` | Puerto HTTP | `8082` |
+| `FOURVENUES_API_HOST` | Host de la API de Fourvenues | `cli-api-service.fourvenues.com` |
+| `FOURVENUES_API_TOKEN` | Token bearer de Fourvenues (requerido) | — |
 
 ## Notas
 
-- Este backend no debe lanzarse desde la app Expo.
-- La app móvil debe apuntar a la URL del backend real o al emulador con `10.0.2.2`.
+- Este backend no debe lanzarse desde la app Expo; es un servicio aparte.
+- La app móvil debe apuntar a la URL pública del backend desplegado (ver `src/config/api.ts` en la raíz del proyecto).

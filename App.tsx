@@ -147,7 +147,7 @@ export default function App() {
       </View>
 
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>NIGHTSPOT</Text>
+        <Text style={styles.headerTitle}>SALIMOS</Text>
         <Text style={styles.headerSubtitle}>El Puerto de Santa María</Text>
       </View>
 

@@ -1,8 +1,5 @@
-import { Platform } from 'react-native';
 import { Evento } from '../types/evento';
-import { API_CONFIG, getApiBaseUrls } from '../config/api';
-
-const API_TOKEN = API_CONFIG.API_TOKEN;
+import { getApiBaseUrls } from '../config/api';
 
 function normalizeEventos(payload: any): Evento[] {
   const rawList = payload?.data?.itemListElement ?? payload?.itemListElement ?? [];
@@ -33,8 +30,7 @@ export interface DiscotecaCoordinates {
  * Obtiene las URLs de metadata de microsites según la plataforma y entorno.
  * Ejemplos:
  *  - Local:  http://localhost:8082/api/microsites/banana/metadata
- *  - API:    https://cli-api-service.fourvenues.com/api/microsites/banana/metadata
- *  - Render: https://nightspot-proxy.onrender.com/api/microsites/banana/metadata
+ *  - Render: https://backend-salimos.onrender.com/api/microsites/banana/metadata
  */
 function getMetadataUrls(slug: string): string[] {
   return getApiBaseUrls().map(
@@ -52,12 +48,7 @@ export async function fetchDiscotecaCoordinates(slug: string): Promise<Discoteca
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -96,12 +87,7 @@ export async function fetchProximosEventos(slug: string): Promise<Evento[]> {
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${API_TOKEN}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const response = await fetch(url);
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);

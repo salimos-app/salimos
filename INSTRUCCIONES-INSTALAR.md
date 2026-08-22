@@ -1,8 +1,8 @@
-# 📲 Cómo Instalar NightSpot sin que Play Protect lo bloquee
+# 📲 Cómo Instalar Salimos sin que Play Protect lo bloquee
 
 ## ¿Por qué salta Play Protect?
 
-Play Protect es el sistema de seguridad de Google que avisa al instalar apps que **no provienen de Google Play Store**. Como NightSpot se distribuye como APK directo, Google muestra un aviso. **La app es 100% segura** — es solo una app de discotecas.
+Play Protect es el sistema de seguridad de Google que avisa al instalar apps que **no provienen de Google Play Store**. Como Salimos se distribuye como APK directo, Google muestra un aviso. **La app es 100% segura** — es solo una app de discotecas.
 
 ---
 
@@ -80,7 +80,7 @@ Google Play Store → Tu perfil (icono) → Play Protect
 Para verificar que el APK es seguro:
 ```bash
 # En tu PC, con el SDK de Android instalado:
-apksigner verify --print-certs NightSpot.apk
+apksigner verify --print-certs Salimos.apk
 ```
 
 La app está firmada con un keystore generado por EAS Build, lo que garantiza que:

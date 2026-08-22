@@ -10,9 +10,6 @@ export const API_CONFIG = {
   // Solo se usa en local si se quiere depurar el backend en la máquina
   LOCAL_API_URL: 'http://10.0.2.2:8082',
 
-  // Token de autenticación
-  API_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhcHAiOiJjbGktYXBpLXNlcnZpY2UiLCJpYXQiOjE3ODY5MDQ5MzR9.gagE3yvxbOaER_dbY8JFrAaFSAJrxwVDWeOg_aXPsS8',
-
   // Producción: usar siempre la URL pública del backend
   isProduction: true,
 };

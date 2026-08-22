@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "salimos?",
-    "slug": "nightspot",
+    "name": "Salimos",
+    "slug": "salimos",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,24 +13,17 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nightspot.app",
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Necesitamos tu ubicación para mostrarte las discotecas cercanas."
-      }
+      "bundleIdentifier": "com.salimos.app"
     },
     "android": {
-      "package": "com.nightspot.app",
+      "package": "com.salimos.app",
       "adaptiveIcon": {
         "backgroundColor": "#0D0B1E",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false,
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
-      ]
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/favicon.png"
