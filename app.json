@@ -30,11 +30,6 @@
     "web": {
       "favicon": "./assets/favicon.png"
     },
-    "extra": {
-      "eas": {
-        "projectId": "023a22b5-64fa-4842-a5fe-4b1921f7b9dc"
-      }
-    },
     "plugins": [
       [
         "expo-splash-screen",
@@ -44,6 +39,12 @@
           "backgroundColor": "#0D0B1E"
         }
       ]
-    ]
+    ],
+    "owner": "bartusito",
+    "extra": {
+      "eas": {
+        "projectId": "cd1b476a-6353-456f-9b12-5ad0800c2bb3"
+      }
+    }
   }
 }

@@ -3,6 +3,15 @@ import { Platform, View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { Region, Discoteca } from '../types/discoteca';
 import DiscotecaMarker from './DiscotecaMarker';
+import { colors } from '../theme/colors';
+
+// CartoDB Dark Matter (variante "nolabels"): tiles oscuros gratis y sin API
+// key, a juego con el tema neón de la app. La variante "nolabels" quita los
+// iconos de POI (iglesias, monumentos...) y nombres de lugares del propio
+// mapa base, para que lo único que se vea sean nuestros marcadores.
+const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
+const TILE_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
 interface MarkerProps {
   coordinate: { latitude: number; longitude: number };
@@ -62,6 +71,41 @@ export function MapViewComponent({
   points = [],
   onPointPress,
 }: MapViewProps) {
+  React.useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const id = 'leaflet-salimos-theme';
+    if (document.getElementById(id)) return;
+
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = `
+      .leaflet-control-zoom a {
+        background-color: ${colors.backgroundLight} !important;
+        color: ${colors.textPrimary} !important;
+        border-color: ${colors.border} !important;
+      }
+      .leaflet-control-zoom a:hover {
+        background-color: ${colors.backgroundCard} !important;
+      }
+      .leaflet-control-attribution {
+        background: ${colors.background}CC !important;
+        color: ${colors.textSecondary} !important;
+      }
+      .leaflet-control-attribution a {
+        color: ${colors.neonPink} !important;
+      }
+      .leaflet-popup-content-wrapper {
+        background: ${colors.backgroundCard} !important;
+        color: ${colors.textPrimary} !important;
+        border-radius: 12px !important;
+      }
+      .leaflet-popup-tip {
+        background: ${colors.backgroundCard} !important;
+      }
+    `;
+    document.head.appendChild(style);
+  }, []);
+
   if (Platform.OS === 'web') {
     const center = region || initialRegion;
     const markers = React.Children.toArray(children).filter((child: any) => {
@@ -160,10 +204,7 @@ export function MapViewComponent({
             click: () => onPress?.(),
           }}
         >
-          <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          />
+          <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
 
           {markers.map((marker: any, index: number) => {
             const { coordinate, onPress, discoteca, title, selected } = marker.props;
@@ -222,13 +263,22 @@ export function MapViewComponent({
   const mapHtml = `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}.club-image{width:100%;height:32px;background-position:center;background-size:cover}.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}.simple-point{width:30px;height:30px;border-radius:50%;background:rgba(12,10,22,.94);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 4px 10px #0006}</style></head>
+<style>
+html,body,#map{height:100%;margin:0;background:${colors.background}}
+.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}
+.club-image{width:100%;height:32px;background-position:center;background-size:cover}
+.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}
+.simple-point{width:30px;height:30px;border-radius:50%;background:rgba(12,10,22,.94);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 4px 10px #0006}
+.leaflet-control-zoom a{background-color:${colors.backgroundLight} !important;color:${colors.textPrimary} !important;border-color:${colors.border} !important}
+.leaflet-control-attribution{background:${colors.background}CC !important;color:${colors.textSecondary} !important}
+.leaflet-control-attribution a{color:${colors.neonPink} !important}
+</style></head>
 <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
 const route=${JSON.stringify(routeCoordinates ?? []).replace(/</g, '\\u003c')};
 const points=${JSON.stringify(points).replace(/</g, '\\u003c')};
 const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
+L.tileLayer('${TILE_URL}',{attribution:${JSON.stringify(TILE_ATTRIBUTION)}}).addTo(map);
 markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+';--club-color:'+item.color+'"><div class="club-image" style="background-image:url(&quot;'+item.image+'&quot;)" ></div><div class="club-name">'+item.title+'</div></div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
 points.forEach(p=>{const icon=L.divIcon({className:'',html:'<div class="simple-point" style="background:'+(p.color||'rgba(12,10,22,.94)')+'">'+(p.icon||'📍')+'</div>',iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15]});L.marker([p.latitude,p.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:p.id})));});
 if(route.length>1){const line=L.polyline(route,{color:'${routeColor}',weight:4}).addTo(map);map.fitBounds(line.getBounds(),{padding:[40,40]});}
@@ -273,7 +323,7 @@ const styles = StyleSheet.create({
   webMap: {
     flex: 1,
     position: 'relative',
-    backgroundColor: '#dfe8f6',
+    backgroundColor: colors.background,
     overflow: 'hidden',
   },
   webMarkerLayer: {
