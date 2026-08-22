@@ -17,15 +17,24 @@ interface Props {
   onBack: () => void;
 }
 
-const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
-const MESES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
+const WEEKDAY_FORMATTER = new Intl.DateTimeFormat('es-ES', { weekday: 'long' });
+const DAY_FORMATTER = new Intl.DateTimeFormat('es-ES', { day: '2-digit' });
+const MONTH_FORMATTER = new Intl.DateTimeFormat('es-ES', { month: 'long' });
 
-function formatFecha(fechaISO: string): { diaSemana: string; dia: string; mes: string } {
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+function formatFecha(fechaISO: string): {
+  diaSemana: string;
+  dia: string;
+  mes: string;
+} {
   const fecha = new Date(fechaISO);
   return {
-    diaSemana: DIAS_SEMANA[fecha.getDay()],
-    dia: fecha.getDate().toString().padStart(2, '0'),
-    mes: MESES[fecha.getMonth()],
+    diaSemana: capitalize(WEEKDAY_FORMATTER.format(fecha)),
+    dia: DAY_FORMATTER.format(fecha),
+    mes: capitalize(MONTH_FORMATTER.format(fecha)),
   };
 }
 
@@ -69,7 +78,9 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
         <View style={styles.eventoInfo}>
           <Text style={styles.eventoNombre}>{item.name}</Text>
           <View style={styles.eventoDetalle}>
-            <Text style={styles.eventoHora}>🕐 {formatHora(item.startDate)}</Text>
+            <Text style={styles.eventoHora}>
+              🕐 {formatHora(item.startDate)}
+            </Text>
             <Text style={styles.eventoUbicacion}>📍 {item.location.name}</Text>
           </View>
         </View>

@@ -2,7 +2,8 @@ import { Evento } from '../types/evento';
 import { getApiBaseUrls } from '../config/api';
 
 function normalizeEventos(payload: any): Evento[] {
-  const rawList = payload?.data?.itemListElement ?? payload?.itemListElement ?? [];
+  const rawList =
+    payload?.data?.itemListElement ?? payload?.itemListElement ?? [];
 
   return rawList
     .map((entry: any) => entry?.item ?? entry)
@@ -34,7 +35,7 @@ export interface DiscotecaCoordinates {
  */
 function getMetadataUrls(slug: string): string[] {
   return getApiBaseUrls().map(
-    (baseUrl) => `${baseUrl}/api/microsites/${slug}/metadata`
+    (baseUrl) => `${baseUrl}/api/microsites/${slug}/metadata`,
   );
 }
 
@@ -42,7 +43,9 @@ function getMetadataUrls(slug: string): string[] {
  * Obtiene las coordenadas de una discoteca desde la API.
  * @param slug Identificador del microsite (ej: "banana")
  */
-export async function fetchDiscotecaCoordinates(slug: string): Promise<DiscotecaCoordinates> {
+export async function fetchDiscotecaCoordinates(
+  slug: string,
+): Promise<DiscotecaCoordinates> {
   const urls = getMetadataUrls(slug);
   let lastError: unknown = null;
 
@@ -74,7 +77,9 @@ export async function fetchDiscotecaCoordinates(slug: string): Promise<Discoteca
     }
   }
 
-  throw lastError ?? new Error('No se pudo cargar las coordenadas de la discoteca.');
+  throw (
+    lastError ?? new Error('No se pudo cargar las coordenadas de la discoteca.')
+  );
 }
 
 /**

@@ -33,13 +33,21 @@ export default function FiltrosBar({ opciones, activos, onToggle }: Props) {
             style={[
               styles.chip,
               activo
-                ? { backgroundColor: opcion.color + '26', borderColor: opcion.color }
+                ? {
+                    backgroundColor: opcion.color + '26',
+                    borderColor: opcion.color,
+                  }
                 : styles.chipInactivo,
             ]}
             onPress={() => onToggle(opcion.id)}
             activeOpacity={0.7}
           >
-            <Text style={[styles.chipText, { color: activo ? opcion.color : colors.textMuted }]}>
+            <Text
+              style={[
+                styles.chipText,
+                { color: activo ? opcion.color : colors.textMuted },
+              ]}
+            >
               {opcion.icon} {opcion.label}
             </Text>
           </TouchableOpacity>

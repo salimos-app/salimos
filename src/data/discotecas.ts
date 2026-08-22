@@ -7,14 +7,16 @@ export const discotecas: Discoteca[] = [
     nombre: 'BANANA',
     slug: 'banana',
     direccion: 'Calle Ribera del Marisco, 13, El Puerto de Santa María (Cádiz)',
-    descripcion: 'Discoteca icónica en El Puerto de Santa María con las mejores sesiones de electrónica y música comercial.',
+    descripcion:
+      'Discoteca icónica en El Puerto de Santa María con las mejores sesiones de electrónica y música comercial.',
     latitud: 36.59821,
     longitud: -6.22418,
     genero: 'Electrónica / Comercial',
     precioEntrada: 15,
     rating: 4.7,
     horario: 'Vie-Sáb 23:30 - 06:00',
-    imagen: 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
+    imagen:
+      'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
     color: colors.neonPink,
   },
   {
@@ -22,14 +24,16 @@ export const discotecas: Discoteca[] = [
     nombre: 'GUATEQUE',
     slug: 'guateque',
     direccion: 'Calle de la Ribera, 18, El Puerto de Santa María (Cádiz)',
-    descripcion: 'Discoteca con ambiente intenso, música comercial y sesiones de electrónica para la última hora del viernes y sábado.',
+    descripcion:
+      'Discoteca con ambiente intenso, música comercial y sesiones de electrónica para la última hora del viernes y sábado.',
     latitud: 36.5971,
     longitud: -6.2249,
     genero: 'Electrónica / Comercial',
     precioEntrada: 18,
     rating: 4.6,
     horario: 'Vie-Sáb 23:30 - 06:00',
-    imagen: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400',
+    imagen:
+      'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400',
     color: colors.neonYellow,
   },
   {
@@ -39,12 +43,13 @@ export const discotecas: Discoteca[] = [
     direccion: 'Calle del Mar, 5, El Puerto de Santa María (Cádiz)',
     descripcion: 'Discoteca de lujo con música electrónica y vistas al mar.',
     latitud: 36.60012,
-    longitud: -6.22000,
+    longitud: -6.22,
     genero: 'Electrónica',
     precioEntrada: 20,
     rating: 4.5,
     horario: 'Vie-Sáb 23:00 - 06:00',
-    imagen: 'https://images.unsplash.com/photo-1582719587489-6f12dbb6d85b?w=400',
+    imagen:
+      'https://images.unsplash.com/photo-1582719587489-6f12dbb6d85b?w=400',
     color: colors.neonPurple,
   },
   {
@@ -52,14 +57,16 @@ export const discotecas: Discoteca[] = [
     nombre: 'Factory',
     slug: 'factory',
     direccion: 'Calle Industrial, 12, El Puerto de Santa María (Cádiz)',
-    descripcion: 'Fábrica abandonada reconvertida en club de techno con sesiones underground.',
-    latitud: 36.60200,
-    longitud: -6.21500,
+    descripcion:
+      'Fábrica abandonada reconvertida en club de techno con sesiones underground.',
+    latitud: 36.602,
+    longitud: -6.215,
     genero: 'Techno',
     precioEntrada: 25,
     rating: 4.8,
     horario: 'Jue-Sáb 00:00 - 07:00',
-    imagen: 'https://images.unsplash.com/photo-1517665884544-9366983cd8c3?w=400',
+    imagen:
+      'https://images.unsplash.com/photo-1517665884544-9366983cd8c3?w=400',
     color: colors.neonBlue,
   },
 ];

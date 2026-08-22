@@ -1,7 +1,16 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
 import { colors } from '../theme/colors';
-import { useAlertCatalog, useDiscotecaAlerts } from '../hooks/useDiscotecaAlerts';
+import {
+  useAlertCatalog,
+  useDiscotecaAlerts,
+} from '../hooks/useDiscotecaAlerts';
 
 interface Props {
   slug: string;
@@ -33,7 +42,8 @@ export default function AlertsPanel({ slug }: Props) {
               <View key={alert.id} style={styles.badge}>
                 <Text style={styles.badgeText}>
                   {type.icon} {type.label}
-                  {alert.value != null ? ` ${alert.value}+` : ''} · {alert.count} · {timeAgo(alert.lastReportedAt)}
+                  {alert.value != null ? ` ${alert.value}+` : ''} ·{' '}
+                  {alert.count} · {timeAgo(alert.lastReportedAt)}
                 </Text>
               </View>
             );
@@ -41,7 +51,11 @@ export default function AlertsPanel({ slug }: Props) {
         </View>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.reportRow}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.reportRow}
+      >
         {catalog.map((type) =>
           type.requiresValue ? (
             (type.valuePresets ?? []).map((value) => (
@@ -56,12 +70,16 @@ export default function AlertsPanel({ slug }: Props) {
               </TouchableOpacity>
             ))
           ) : (
-            <TouchableOpacity key={type.id} style={styles.reportButton} onPress={() => report(type.id)}>
+            <TouchableOpacity
+              key={type.id}
+              style={styles.reportButton}
+              onPress={() => report(type.id)}
+            >
               <Text style={styles.reportButtonText}>
                 {type.icon} {type.label}
               </Text>
             </TouchableOpacity>
-          )
+          ),
         )}
       </ScrollView>
     </View>

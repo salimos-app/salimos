@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+} from 'react-native';
 import { colors } from '../theme/colors';
 import { RouteResult, TravelProfile } from '../services/directionsApi';
 
@@ -18,15 +24,25 @@ const PROFILES: { id: TravelProfile; icon: string; label: string }[] = [
 ];
 
 function formatDistance(meters: number): string {
-  return meters >= 1000 ? `${(meters / 1000).toFixed(1)} km` : `${Math.round(meters)} m`;
+  return meters >= 1000
+    ? `${(meters / 1000).toFixed(1)} km`
+    : `${Math.round(meters)} m`;
 }
 
 function formatDuration(seconds: number): string {
   const minutes = Math.round(seconds / 60);
-  return minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} min` : `${minutes} min`;
+  return minutes >= 60
+    ? `${Math.floor(minutes / 60)} h ${minutes % 60} min`
+    : `${minutes} min`;
 }
 
-export default function RoutePanel({ route, loading, error, onSelectProfile, onClear }: Props) {
+export default function RoutePanel({
+  route,
+  loading,
+  error,
+  onSelectProfile,
+  onClear,
+}: Props) {
   return (
     <View style={styles.container}>
       <View style={styles.profileRow}>
@@ -61,7 +77,8 @@ export default function RoutePanel({ route, loading, error, onSelectProfile, onC
 
       {route && !loading && !error && (
         <Text style={styles.summaryText}>
-          🧭 {formatDistance(route.distanceMeters)} · {formatDuration(route.durationSeconds)}
+          🧭 {formatDistance(route.distanceMeters)} ·{' '}
+          {formatDuration(route.durationSeconds)}
         </Text>
       )}
     </View>

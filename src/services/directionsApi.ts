@@ -19,7 +19,11 @@ export interface RouteResult {
  * puntos para un modo de viaje dado. La API key de ORS nunca sale del
  * backend; el cliente solo necesita coordenadas.
  */
-export async function fetchRoute(profile: TravelProfile, start: LatLng, end: LatLng): Promise<RouteResult> {
+export async function fetchRoute(
+  profile: TravelProfile,
+  start: LatLng,
+  end: LatLng,
+): Promise<RouteResult> {
   const startParam = `${start.longitude},${start.latitude}`;
   const endParam = `${end.longitude},${end.latitude}`;
   const url = `${getApiBaseUrl()}/api/directions/${profile}?start=${startParam}&end=${endParam}`;
@@ -37,7 +41,7 @@ export async function fetchRoute(profile: TravelProfile, start: LatLng, end: Lat
   }
 
   const coordinates: [number, number][] = feature.geometry.coordinates.map(
-    ([longitude, latitude]: [number, number]) => [latitude, longitude]
+    ([longitude, latitude]: [number, number]) => [latitude, longitude],
   );
   const summary = feature.properties?.summary ?? { distance: 0, duration: 0 };
 

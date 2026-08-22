@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import { subscribeToAlerts, subscribeToCatalog, reportAlert } from '../services/alertsSocket';
+import {
+  subscribeToAlerts,
+  subscribeToCatalog,
+  reportAlert,
+} from '../services/alertsSocket';
 import { AlertType, DiscotecaAlert } from '../types/alert';
 
 /** Catálogo de tipos de alerta disponibles (lo define el backend). */
@@ -19,6 +23,7 @@ export function useDiscotecaAlerts(slug: string) {
 
   return {
     alerts,
-    report: (alertType: string, value?: number) => reportAlert(slug, alertType, value),
+    report: (alertType: string, value?: number) =>
+      reportAlert(slug, alertType, value),
   };
 }

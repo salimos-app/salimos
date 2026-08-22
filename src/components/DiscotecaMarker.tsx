@@ -8,7 +8,11 @@ interface Props {
   selected?: boolean;
 }
 
-export default function DiscotecaMarker({ nombre, color, selected = false }: Props) {
+export default function DiscotecaMarker({
+  nombre,
+  color,
+  selected = false,
+}: Props) {
   const firstLetter = nombre ? nombre[0].toUpperCase() : '?';
 
   return (
@@ -16,7 +20,10 @@ export default function DiscotecaMarker({ nombre, color, selected = false }: Pro
       <View
         style={[
           styles.pin,
-          { backgroundColor: color, borderColor: selected ? colors.textPrimary : color },
+          {
+            backgroundColor: color,
+            borderColor: selected ? colors.textPrimary : color,
+          },
           selected && styles.pinSelected,
         ]}
       >
@@ -26,7 +33,10 @@ export default function DiscotecaMarker({ nombre, color, selected = false }: Pro
         <View
           style={[
             styles.pinTail,
-            { backgroundColor: color, borderColor: selected ? colors.textPrimary : color },
+            {
+              backgroundColor: color,
+              borderColor: selected ? colors.textPrimary : color,
+            },
           ]}
         />
       </View>

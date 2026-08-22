@@ -1,5 +1,11 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Linking,
+} from 'react-native';
 import { colors } from '../theme/colors';
 import { SimpleMapPoint } from './MapView';
 import RoutePanel from './RoutePanel';
@@ -21,7 +27,15 @@ interface Props {
  * discoteca, pero más simple: nombre, botón de llamar si tiene teléfono, y
  * "Cómo llegar".
  */
-export default function PointCard({ point, route, routeLoading, routeError, onSelectProfile, onClearRoute, onClose }: Props) {
+export default function PointCard({
+  point,
+  route,
+  routeLoading,
+  routeError,
+  onSelectProfile,
+  onClearRoute,
+  onClose,
+}: Props) {
   const handleCall = () => {
     if (point.phone) {
       Linking.openURL(`tel:${point.phone.replace(/\s+/g, '')}`);
@@ -29,16 +43,25 @@ export default function PointCard({ point, route, routeLoading, routeError, onSe
   };
 
   return (
-    <View style={[styles.card, { borderLeftColor: point.color ?? colors.border }]}>
+    <View
+      style={[styles.card, { borderLeftColor: point.color ?? colors.border }]}
+    >
       <View style={styles.header}>
-        <View style={[styles.iconCircle, { backgroundColor: point.color ?? colors.backgroundLight }]}>
+        <View
+          style={[
+            styles.iconCircle,
+            { backgroundColor: point.color ?? colors.backgroundLight },
+          ]}
+        >
           <Text style={styles.icon}>{point.icon ?? '📍'}</Text>
         </View>
         <View style={styles.headerText}>
           <Text style={styles.nombre} numberOfLines={2}>
             {point.label}
           </Text>
-          {point.sublabel ? <Text style={styles.sublabel}>{point.sublabel}</Text> : null}
+          {point.sublabel ? (
+            <Text style={styles.sublabel}>{point.sublabel}</Text>
+          ) : null}
         </View>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
           <Text style={styles.closeText}>✕</Text>

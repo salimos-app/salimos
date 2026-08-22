@@ -1,10 +1,21 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  ActivityIndicator,
+} from 'react-native';
 import { colors } from './src/theme/colors';
 import { discotecas } from './src/data/discotecas';
 import { Discoteca } from './src/types/discoteca';
-import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
+import {
+  MapViewComponent,
+  MarkerComponent,
+  SimpleMapPoint,
+} from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
 import AlertsPanel from './src/components/AlertsPanel';
@@ -12,20 +23,34 @@ import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
 import FiltrosBar, { FiltroOpcion } from './src/components/FiltrosBar';
 import { useRoute } from './src/hooks/useRoute';
-import { fetchDiscotecaCoordinates, DiscotecaCoordinates } from './src/services/eventosApi';
-import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
+import {
+  fetchDiscotecaCoordinates,
+  DiscotecaCoordinates,
+} from './src/services/eventosApi';
+import {
+  paradasTaxi,
+  RADIO_TAXI_NOMBRE,
+  RADIO_TAXI_TELEFONO,
+} from './src/data/taxis';
 import { sitios } from './src/data/sitios';
 import { SitioCategoria } from './src/types/sitio';
 
-const banana: Discoteca = discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
-const guateque: Discoteca = discotecas.find((d) => d.slug === 'guateque') ?? discotecas[1];
+const banana: Discoteca =
+  discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
+const guateque: Discoteca =
+  discotecas.find((d) => d.slug === 'guateque') ?? discotecas[1];
 
 type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
 
 const FILTROS: FiltroOpcion[] = [
   { id: 'discotecas', icon: '🪩', label: 'Discotecas', color: colors.neonPink },
   { id: 'bares', icon: '🍺', label: 'Bares', color: colors.neonPurple },
-  { id: 'supermercados', icon: '🛒', label: 'Supermercados', color: colors.neonGreen },
+  {
+    id: 'supermercados',
+    icon: '🛒',
+    label: 'Supermercados',
+    color: colors.neonGreen,
+  },
   { id: 'taxis', icon: '🚕', label: 'Taxis', color: colors.neonYellow },
 ];
 
@@ -48,11 +73,22 @@ const taxiPoints: SimpleMapPoint[] = paradasTaxi.map((parada) => ({
 }));
 
 // Bares/pubs en un color, supermercados/tiendas de conveniencia en otro.
-const SITIO_ESTILO: Record<SitioCategoria, { icon: string; color: string; etiqueta: string }> = {
+const SITIO_ESTILO: Record<
+  SitioCategoria,
+  { icon: string; color: string; etiqueta: string }
+> = {
   bar: { icon: '🍺', color: colors.neonPurple, etiqueta: 'Bar' },
   pub: { icon: '🍻', color: colors.neonPurple, etiqueta: 'Pub' },
-  supermarket: { icon: '🛒', color: colors.neonGreen, etiqueta: 'Supermercado' },
-  convenience: { icon: '🏪', color: colors.neonGreen, etiqueta: 'Tienda de conveniencia' },
+  supermarket: {
+    icon: '🛒',
+    color: colors.neonGreen,
+    etiqueta: 'Supermercado',
+  },
+  convenience: {
+    icon: '🏪',
+    color: colors.neonGreen,
+    etiqueta: 'Tienda de conveniencia',
+  },
 };
 
 const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
@@ -83,9 +119,15 @@ const defaultGuatequeCoords: DiscotecaCoordinates = {
 };
 
 export default function App() {
-  const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(null);
-  const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
-  const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
+  const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(
+    null,
+  );
+  const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(
+    null,
+  );
+  const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(
+    null,
+  );
   const [filtros, setFiltros] = useState<Record<FiltroCategoria, boolean>>({
     discotecas: true,
     bares: true,
@@ -93,17 +135,27 @@ export default function App() {
     taxis: true,
   });
   // Inicializa con los datos locales para que la app se muestre al instante
-  const [bananaCoords, setBananaCoords] = useState<DiscotecaCoordinates>(defaultBananaCoords);
-  const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(defaultGuatequeCoords);
-  const { route, loading: routeLoading, error: routeError, calculateRoute, clearRoute } = useRoute();
+  const [bananaCoords, setBananaCoords] =
+    useState<DiscotecaCoordinates>(defaultBananaCoords);
+  const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(
+    defaultGuatequeCoords,
+  );
+  const {
+    route,
+    loading: routeLoading,
+    error: routeError,
+    calculateRoute,
+    clearRoute,
+  } = useRoute();
 
   const selectedClub = selectedMarkerSlug
-    ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
+    ? (discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ??
+      null)
     : null;
 
   const visiblePoints = useMemo(
     () => mapPoints.filter((point) => filtros[filtroDe(point)]),
-    [filtros]
+    [filtros],
   );
 
   useEffect(() => {
@@ -120,7 +172,10 @@ export default function App() {
           setGuatequeCoords(guatequeData);
         }
       } catch (error) {
-        console.warn('Error cargando coordenadas (usando datos locales):', error);
+        console.warn(
+          'Error cargando coordenadas (usando datos locales):',
+          error,
+        );
         // Ya están los datos locales por defecto
       } finally {
         // La vista usa las coordenadas locales mientras la API responde.
@@ -216,7 +271,11 @@ export default function App() {
               selected={selectedMarkerSlug === banana.slug}
               onPress={() => handleMarkerPress(banana)}
             >
-              <DiscotecaMarker nombre={banana.nombre} color={banana.color} selected={selectedMarkerSlug === banana.slug} />
+              <DiscotecaMarker
+                nombre={banana.nombre}
+                color={banana.color}
+                selected={selectedMarkerSlug === banana.slug}
+              />
             </MarkerComponent>
           )}
 
@@ -232,7 +291,11 @@ export default function App() {
               selected={selectedMarkerSlug === guateque.slug}
               onPress={() => handleMarkerPress(guateque)}
             >
-              <DiscotecaMarker nombre={guateque.nombre} color={guateque.color} selected={selectedMarkerSlug === guateque.slug} />
+              <DiscotecaMarker
+                nombre={guateque.nombre}
+                color={guateque.color}
+                selected={selectedMarkerSlug === guateque.slug}
+              />
             </MarkerComponent>
           )}
         </MapViewComponent>
@@ -245,7 +308,11 @@ export default function App() {
         </View>
       </View>
 
-      <FiltrosBar opciones={FILTROS} activos={filtros} onToggle={toggleFiltro} />
+      <FiltrosBar
+        opciones={FILTROS}
+        activos={filtros}
+        onToggle={toggleFiltro}
+      />
 
       {selectedPoint && (
         <PointCard
@@ -254,7 +321,10 @@ export default function App() {
           routeLoading={routeLoading}
           routeError={routeError}
           onSelectProfile={(profile) =>
-            calculateRoute(profile, { latitude: selectedPoint.latitude, longitude: selectedPoint.longitude })
+            calculateRoute(profile, {
+              latitude: selectedPoint.latitude,
+              longitude: selectedPoint.longitude,
+            })
           }
           onClearRoute={clearRoute}
           onClose={handleMapPress}
@@ -267,24 +337,53 @@ export default function App() {
           <View style={styles.cardContent}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardNombre}>{selectedClub.nombre}</Text>
-              <View style={[styles.ratingBadge, { backgroundColor: colors.neonYellow + '22' }]}>
-                <Text style={[styles.ratingText, { color: colors.neonYellow }]}>⭐ {selectedClub.rating.toFixed(1)}</Text>
+              <View
+                style={[
+                  styles.ratingBadge,
+                  { backgroundColor: colors.neonYellow + '22' },
+                ]}
+              >
+                <Text style={[styles.ratingText, { color: colors.neonYellow }]}>
+                  ⭐ {selectedClub.rating.toFixed(1)}
+                </Text>
               </View>
             </View>
 
             <Text style={styles.direccion}>{selectedClub.direccion}</Text>
 
             <View style={styles.tags}>
-              <View style={[styles.tag, { backgroundColor: selectedClub.color + '22', borderColor: selectedClub.color + '55' }]}>
-                <Text style={[styles.tagText, { color: selectedClub.color }]}>{selectedClub.genero}</Text>
+              <View
+                style={[
+                  styles.tag,
+                  {
+                    backgroundColor: selectedClub.color + '22',
+                    borderColor: selectedClub.color + '55',
+                  },
+                ]}
+              >
+                <Text style={[styles.tagText, { color: selectedClub.color }]}>
+                  {selectedClub.genero}
+                </Text>
               </View>
-              <View style={[styles.tag, { backgroundColor: colors.neonGreen + '22', borderColor: colors.neonGreen + '55' }]}>
-                <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {selectedClub.precioEntrada}€</Text>
+              <View
+                style={[
+                  styles.tag,
+                  {
+                    backgroundColor: colors.neonGreen + '22',
+                    borderColor: colors.neonGreen + '55',
+                  },
+                ]}
+              >
+                <Text style={[styles.tagText, { color: colors.neonGreen }]}>
+                  💶 {selectedClub.precioEntrada}€
+                </Text>
               </View>
             </View>
 
             <Text style={styles.horario}>🕐 {selectedClub.horario}</Text>
-            <Text style={styles.descripcion} numberOfLines={2}>{selectedClub.descripcion}</Text>
+            <Text style={styles.descripcion} numberOfLines={2}>
+              {selectedClub.descripcion}
+            </Text>
 
             <AlertsPanel slug={selectedClub.slug} />
 
@@ -293,13 +392,21 @@ export default function App() {
               loading={routeLoading}
               error={routeError}
               onSelectProfile={(profile) =>
-                calculateRoute(profile, { latitude: selectedClub.latitud, longitude: selectedClub.longitud })
+                calculateRoute(profile, {
+                  latitude: selectedClub.latitud,
+                  longitude: selectedClub.longitud,
+                })
               }
               onClear={clearRoute}
             />
 
-            <TouchableOpacity style={styles.eventosButton} onPress={() => openEventos(selectedClub)}>
-              <Text style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>
+            <TouchableOpacity
+              style={styles.eventosButton}
+              onPress={() => openEventos(selectedClub)}
+            >
+              <Text style={styles.eventosButtonText}>
+                📅 Ver próximos eventos
+              </Text>
             </TouchableOpacity>
           </View>
         </View>

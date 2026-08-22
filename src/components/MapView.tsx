@@ -9,7 +9,8 @@ import { colors } from '../theme/colors';
 // key, a juego con el tema neón de la app. La variante "nolabels" quita los
 // iconos de POI (iglesias, monumentos...) y nombres de lugares del propio
 // mapa base, para que lo único que se vea sean nuestros marcadores.
-const TILE_URL = 'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
+const TILE_URL =
+  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
 const TILE_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
 
@@ -111,7 +112,10 @@ export function MapViewComponent({
     const markers = React.Children.toArray(children).filter((child: any) => {
       if (!React.isValidElement(child)) return false;
       const props = child.props as Partial<MarkerProps>;
-      return !!props.coordinate && (!!props.discoteca || !!props.title || !!props.children);
+      return (
+        !!props.coordinate &&
+        (!!props.discoteca || !!props.title || !!props.children)
+      );
     });
 
     const MapContainer = require('react-leaflet').MapContainer;
@@ -207,22 +211,31 @@ export function MapViewComponent({
           <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
 
           {markers.map((marker: any, index: number) => {
-            const { coordinate, onPress, discoteca, title, selected } = marker.props;
+            const { coordinate, onPress, discoteca, title, selected } =
+              marker.props;
             const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
             const color = discoteca?.color ?? '#ff4d4d';
             const discotecaFallback = {
               ...discoteca,
               nombre,
               color,
-              imagen: discoteca?.imagen ?? 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
+              imagen:
+                discoteca?.imagen ??
+                'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
             } as Discoteca;
-            const position: [number, number] = [coordinate.latitude, coordinate.longitude];
+            const position: [number, number] = [
+              coordinate.latitude,
+              coordinate.longitude,
+            ];
 
             return (
               <Marker
                 key={`${discoteca?.id ?? title ?? 'marker'}-${index}`}
                 position={position}
-                icon={defaultIcon(discoteca ?? discotecaFallback, Boolean(selected))}
+                icon={defaultIcon(
+                  discoteca ?? discotecaFallback,
+                  Boolean(selected),
+                )}
                 eventHandlers={{ click: onPress ?? (() => undefined) }}
               >
                 <Popup>{nombre}</Popup>
@@ -240,7 +253,10 @@ export function MapViewComponent({
           ))}
 
           {routeCoordinates && routeCoordinates.length > 1 && (
-            <Polyline positions={routeCoordinates} pathOptions={{ color: routeColor, weight: 4 }} />
+            <Polyline
+              positions={routeCoordinates}
+              pathOptions={{ color: routeColor, weight: 4 }}
+            />
           )}
         </MapContainer>
       </View>
@@ -248,7 +264,10 @@ export function MapViewComponent({
   }
 
   const markers = React.Children.toArray(children).filter((child: any) => {
-    return React.isValidElement(child) && Boolean((child as React.ReactElement<MarkerProps>).props.coordinate);
+    return (
+      React.isValidElement(child) &&
+      Boolean((child as React.ReactElement<MarkerProps>).props.coordinate)
+    );
   }) as React.ReactElement<MarkerProps>[];
   const center = region || initialRegion;
   const markerData = markers.map((marker, index) => ({
@@ -257,7 +276,9 @@ export function MapViewComponent({
     longitude: marker.props.coordinate.longitude,
     title: marker.props.title ?? 'Discoteca',
     color: marker.props.discoteca?.color ?? '#ff4d4d',
-    image: marker.props.discoteca?.imagen ?? 'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
+    image:
+      marker.props.discoteca?.imagen ??
+      'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400',
     selected: Boolean(marker.props.selected),
   }));
   const mapHtml = `<!doctype html>
@@ -295,7 +316,10 @@ map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'m
       onMessage={(event) => {
         try {
           const message = JSON.parse(event.nativeEvent.data);
-          if (message.type === 'marker' && markers[message.index]?.props.onPress) {
+          if (
+            message.type === 'marker' &&
+            markers[message.index]?.props.onPress
+          ) {
             markers[message.index].props.onPress?.();
           } else if (message.type === 'point') {
             const point = points.find((p) => p.id === message.id);
@@ -311,7 +335,16 @@ map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'m
   );
 }
 
-export function MarkerComponent({ coordinate, title, pinColor, onPress, children, tracksViewChanges, discoteca, selected }: MarkerProps) {
+export function MarkerComponent({
+  coordinate,
+  title,
+  pinColor,
+  onPress,
+  children,
+  tracksViewChanges,
+  discoteca,
+  selected,
+}: MarkerProps) {
   if (Platform.OS === 'web') {
     return <>{children}</>;
   }

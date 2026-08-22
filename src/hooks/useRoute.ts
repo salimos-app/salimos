@@ -1,6 +1,11 @@
 import { useState } from 'react';
 import * as Location from 'expo-location';
-import { fetchRoute, LatLng, RouteResult, TravelProfile } from '../services/directionsApi';
+import {
+  fetchRoute,
+  LatLng,
+  RouteResult,
+  TravelProfile,
+} from '../services/directionsApi';
 
 /**
  * Calcula una ruta desde la ubicación actual del usuario hasta un destino,
@@ -12,14 +17,19 @@ export function useRoute() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const calculateRoute = async (profile: TravelProfile, destination: LatLng) => {
+  const calculateRoute = async (
+    profile: TravelProfile,
+    destination: LatLng,
+  ) => {
     setLoading(true);
     setError(null);
 
     try {
       const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        throw new Error('Necesitamos permiso de ubicación para calcular la ruta.');
+        throw new Error(
+          'Necesitamos permiso de ubicación para calcular la ruta.',
+        );
       }
 
       const position = await Location.getCurrentPositionAsync({});
@@ -32,7 +42,9 @@ export function useRoute() {
       setRoute(result);
     } catch (err) {
       setRoute(null);
-      setError(err instanceof Error ? err.message : 'No se pudo calcular la ruta.');
+      setError(
+        err instanceof Error ? err.message : 'No se pudo calcular la ruta.',
+      );
     } finally {
       setLoading(false);
     }

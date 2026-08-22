@@ -54,13 +54,16 @@ function handleMessage(raw: string): void {
     }
     case 'alerts:sync': {
       const room = new Map<string, DiscotecaAlert>();
-      (message.alerts ?? []).forEach((alert: DiscotecaAlert) => room.set(alert.id, alert));
+      (message.alerts ?? []).forEach((alert: DiscotecaAlert) =>
+        room.set(alert.id, alert),
+      );
       alertsBySlug.set(message.slug, room);
       notifySlug(message.slug);
       break;
     }
     case 'alerts:update': {
-      const room = alertsBySlug.get(message.slug) ?? new Map<string, DiscotecaAlert>();
+      const room =
+        alertsBySlug.get(message.slug) ?? new Map<string, DiscotecaAlert>();
       room.set(message.alert.id, message.alert);
       alertsBySlug.set(message.slug, room);
       notifySlug(message.slug);
@@ -88,7 +91,11 @@ function scheduleReconnect(): void {
 }
 
 function ensureSocket(): void {
-  if (socket && (socket.readyState === WebSocket.OPEN || socket.readyState === WebSocket.CONNECTING)) {
+  if (
+    socket &&
+    (socket.readyState === WebSocket.OPEN ||
+      socket.readyState === WebSocket.CONNECTING)
+  ) {
     return;
   }
 
@@ -115,7 +122,10 @@ export function subscribeToCatalog(listener: CatalogListener): () => void {
 }
 
 /** Se suscribe a las alertas activas de una discoteca. */
-export function subscribeToAlerts(slug: string, listener: AlertsListener): () => void {
+export function subscribeToAlerts(
+  slug: string,
+  listener: AlertsListener,
+): () => void {
   if (!listenersBySlug.has(slug)) {
     listenersBySlug.set(slug, new Set());
   }
@@ -140,6 +150,10 @@ export function subscribeToAlerts(slug: string, listener: AlertsListener): () =>
 }
 
 /** Reporta una alerta para una discoteca (value obligatorio si el tipo lo requiere). */
-export function reportAlert(slug: string, alertType: string, value?: number): void {
+export function reportAlert(
+  slug: string,
+  alertType: string,
+  value?: number,
+): void {
   send({ type: 'report', slug, alertType, value });
 }
