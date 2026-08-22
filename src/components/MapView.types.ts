@@ -9,6 +9,10 @@ export interface MarkerProps {
   children?: React.ReactNode;
   discoteca?: Discoteca;
   selected?: boolean;
+  /** Muestra un badge (estilo Waze) pegado a la izquierda del pin si hay alertas activas. */
+  hasAlerts?: boolean;
+  /** Foto del evento del día: reemplaza la inicial como contenido principal del pin. */
+  eventImage?: string;
 }
 
 /** Punto genérico en el mapa (paradas de taxi, bares, supermercados...). */
@@ -35,7 +39,6 @@ export interface MapViewProps {
   onPress?: () => void;
   /** Puntos [latitud, longitud] de una ruta a dibujar sobre el mapa. */
   routeCoordinates?: [number, number][];
-  routeColor?: string;
   /** Puntos genéricos (no discotecas) a marcar en el mapa. */
   points?: SimpleMapPoint[];
   /** Se llama al tocar uno de `points` (abre la tarjeta correspondiente en la app). */

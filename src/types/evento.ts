@@ -11,4 +11,5 @@ export interface Evento {
   endDate: string;
   url: string;
   location: Location;
+  image?: string;
 }

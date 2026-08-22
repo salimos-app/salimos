@@ -61,6 +61,52 @@ function normalizeEventos(payload: unknown): Evento[] {
     });
 }
 
+/**
+ * Normaliza la respuesta de /api/microsites/:slug/events (proxy de /api/events
+ * de Fourvenues), que a diferencia del feed de /metadata sí trae `image`.
+ */
+function normalizeEventosConImagen(payload: unknown): Evento[] {
+  if (typeof payload !== 'object' || payload === null) {
+    return [];
+  }
+
+  const rawList = (payload as Record<string, unknown>).data;
+  if (!Array.isArray(rawList)) {
+    return [];
+  }
+
+  return rawList
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as Record<string, unknown>).name === 'string',
+    )
+    .map((item): Evento => {
+      const dates = item.dates as { start?: number; end?: number } | undefined;
+      const organization = item.organization as
+        | { name?: string; slug?: string }
+        | undefined;
+      const location = item.location as
+        | { addressComplete?: string }
+        | undefined;
+
+      return {
+        name: item.name as string,
+        startDate: dates?.start
+          ? new Date(dates.start * 1000).toISOString()
+          : '',
+        endDate: dates?.end ? new Date(dates.end * 1000).toISOString() : '',
+        url: `https://site.fourvenues.com/${organization?.slug ?? ''}/events/${item.code as string}`,
+        location: {
+          name: organization?.name ?? 'Sin ubicación',
+          address: { streetAddress: location?.addressComplete ?? '' },
+        },
+        image: typeof item.image === 'string' ? item.image : undefined,
+      };
+    });
+}
+
 export interface DiscotecaCoordinates {
   latitude: number;
   longitude: number;
@@ -77,6 +123,12 @@ export interface DiscotecaCoordinates {
 function getMetadataUrls(slug: string): string[] {
   return getApiBaseUrls().map(
     (baseUrl) => `${baseUrl}/api/microsites/${slug}/metadata`,
+  );
+}
+
+function getEventsUrls(slug: string): string[] {
+  return getApiBaseUrls().map(
+    (baseUrl) => `${baseUrl}/api/microsites/${slug}/events`,
   );
 }
 
@@ -124,11 +176,13 @@ export async function fetchDiscotecaCoordinates(
 }
 
 /**
- * Obtiene los próximos eventos de una discoteca.
+ * Obtiene los próximos eventos de una discoteca, con foto cuando Fourvenues
+ * la tenga cargada (a diferencia de /metadata, que es solo el feed schema.org
+ * sin imágenes).
  * @param slug Identificador del microsite (ej: "banana")
  */
 export async function fetchProximosEventos(slug: string): Promise<Evento[]> {
-  const urls = getMetadataUrls(slug);
+  const urls = getEventsUrls(slug);
   let lastError: unknown = null;
 
   for (const url of urls) {
@@ -140,14 +194,30 @@ export async function fetchProximosEventos(slug: string): Promise<Evento[]> {
       }
 
       const payload = await response.json();
-      const eventos = normalizeEventos(payload);
+      const eventos = normalizeEventosConImagen(payload);
 
-      if (Array.isArray(eventos) && eventos.length > 0) {
+      if (eventos.length > 0) {
         return eventos;
       }
     } catch (error) {
       lastError = error;
       console.warn(`Fallo cargando eventos desde ${url}:`, error);
+    }
+  }
+
+  // Fallback: si /events falla, al menos se listan los eventos sin foto.
+  const metadataUrls = getMetadataUrls(slug);
+  for (const url of metadataUrls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const eventos = normalizeEventos(payload);
+      if (eventos.length > 0) {
+        return eventos;
+      }
+    } catch (error) {
+      lastError = error;
     }
   }
 

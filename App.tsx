@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { colors } from './src/theme/colors';
+import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, gradients } from './src/theme/colors';
 import { discotecas } from './src/data/discotecas';
 import { Discoteca } from './src/types/discoteca';
-import {
-  MapViewComponent,
-  MarkerComponent,
-  SimpleMapPoint,
-} from './src/components/MapView';
+import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
 import AlertsPanel from './src/components/AlertsPanel';
@@ -16,30 +13,21 @@ import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
 import FiltrosBar, { FiltroOpcion } from './src/components/FiltrosBar';
 import { useRoute } from './src/hooks/useRoute';
-import {
-  fetchDiscotecaCoordinates,
-  DiscotecaCoordinates,
-} from './src/services/eventosApi';
-import { paradasTaxi, RADIO_TAXI_TELEFONO } from './src/data/taxis';
+import { useDiscotecaAlerts } from './src/hooks/useDiscotecaAlerts';
+import { fetchDiscotecaCoordinates, fetchProximosEventos, DiscotecaCoordinates } from './src/services/eventosApi';
+import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
 import { sitios } from './src/data/sitios';
 import { SitioCategoria } from './src/types/sitio';
 
-const banana: Discoteca =
-  discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
-const guateque: Discoteca =
-  discotecas.find((d) => d.slug === 'guateque') ?? discotecas[1];
+const banana: Discoteca = discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
+const guateque: Discoteca = discotecas.find((d) => d.slug === 'guateque') ?? discotecas[1];
 
 type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
 
 const FILTROS: FiltroOpcion[] = [
   { id: 'discotecas', icon: '🪩', label: 'Discotecas', color: colors.neonPink },
   { id: 'bares', icon: '🍺', label: 'Bares', color: colors.neonPurple },
-  {
-    id: 'supermercados',
-    icon: '🛒',
-    label: 'Supermercados',
-    color: colors.neonGreen,
-  },
+  { id: 'supermercados', icon: '🛒', label: 'Supermercados', color: colors.neonGreen },
   { id: 'taxis', icon: '🚕', label: 'Taxis', color: colors.neonYellow },
 ];
 
@@ -62,22 +50,11 @@ const taxiPoints: SimpleMapPoint[] = paradasTaxi.map((parada) => ({
 }));
 
 // Bares/pubs en un color, supermercados/tiendas de conveniencia en otro.
-const SITIO_ESTILO: Record<
-  SitioCategoria,
-  { icon: string; color: string; etiqueta: string }
-> = {
+const SITIO_ESTILO: Record<SitioCategoria, { icon: string; color: string; etiqueta: string }> = {
   bar: { icon: '🍺', color: colors.neonPurple, etiqueta: 'Bar' },
   pub: { icon: '🍻', color: colors.neonPurple, etiqueta: 'Pub' },
-  supermarket: {
-    icon: '🛒',
-    color: colors.neonGreen,
-    etiqueta: 'Supermercado',
-  },
-  convenience: {
-    icon: '🏪',
-    color: colors.neonGreen,
-    etiqueta: 'Tienda de conveniencia',
-  },
+  supermarket: { icon: '🛒', color: colors.neonGreen, etiqueta: 'Supermercado' },
+  convenience: { icon: '🏪', color: colors.neonGreen, etiqueta: 'Tienda de conveniencia' },
 };
 
 const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
@@ -108,15 +85,9 @@ const defaultGuatequeCoords: DiscotecaCoordinates = {
 };
 
 export default function App() {
-  const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(
-    null,
-  );
-  const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(
-    null,
-  );
-  const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(
-    null,
-  );
+  const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(null);
+  const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
+  const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
   const [filtros, setFiltros] = useState<Record<FiltroCategoria, boolean>>({
     discotecas: true,
     bares: true,
@@ -124,27 +95,66 @@ export default function App() {
     taxis: true,
   });
   // Inicializa con los datos locales para que la app se muestre al instante
-  const [bananaCoords, setBananaCoords] =
-    useState<DiscotecaCoordinates>(defaultBananaCoords);
-  const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(
-    defaultGuatequeCoords,
-  );
-  const {
-    route,
-    loading: routeLoading,
-    error: routeError,
-    calculateRoute,
-    clearRoute,
-  } = useRoute();
+  const [bananaCoords, setBananaCoords] = useState<DiscotecaCoordinates>(defaultBananaCoords);
+  const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(defaultGuatequeCoords);
+  const { route, loading: routeLoading, error: routeError, calculateRoute, clearRoute } = useRoute();
+
+  // Alertas en vivo por discoteca (estilo Waze), para el badge en el pin del
+  // mapa: se suscriben siempre mientras el mapa está en pantalla, no solo
+  // cuando esa discoteca está seleccionada.
+  const { alerts: bananaAlerts } = useDiscotecaAlerts(banana.slug);
+  const { alerts: guatequeAlerts } = useDiscotecaAlerts(guateque.slug);
+
+  // Foto del próximo evento de cada discoteca: es lo más importante
+  // visualmente del pin (reemplaza la inicial) y también se usa en la
+  // tarjeta del mapa en vez de la foto genérica del local. Se piden para
+  // las dos discotecas siempre (no solo la seleccionada) para que los pines
+  // en el mapa ya se vean con la foto del evento sin necesidad de tocarlos.
+  const [bananaEventImage, setBananaEventImage] = useState<string | null>(null);
+  const [guatequeEventImage, setGuatequeEventImage] = useState<string | null>(null);
 
   const selectedClub = selectedMarkerSlug
-    ? (discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ??
-      null)
+    ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
     : null;
+
+  const currentEventImage =
+    selectedClub?.slug === banana.slug
+      ? bananaEventImage
+      : selectedClub?.slug === guateque.slug
+        ? guatequeEventImage
+        : null;
+
+  useEffect(() => {
+    let mounted = true;
+
+    // No todos los eventos tienen foto cargada en Fourvenues (algunas
+    // discotecas solo le suben foto a algunos eventos): se toma la del
+    // primer evento próximo que sí tenga, no necesariamente el más cercano.
+    const primeraConFoto = (eventos: { image?: string }[]) =>
+      eventos.find((evento) => evento.image)?.image ?? null;
+
+    fetchProximosEventos(banana.slug)
+      .then((eventos) => {
+        if (mounted) setBananaEventImage(primeraConFoto(eventos));
+      })
+      .catch(() => {
+        // Si falla, el pin y la tarjeta caen a la foto genérica del local.
+      });
+
+    fetchProximosEventos(guateque.slug)
+      .then((eventos) => {
+        if (mounted) setGuatequeEventImage(primeraConFoto(eventos));
+      })
+      .catch(() => {});
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const visiblePoints = useMemo(
     () => mapPoints.filter((point) => filtros[filtroDe(point)]),
-    [filtros],
+    [filtros]
   );
 
   useEffect(() => {
@@ -161,10 +171,7 @@ export default function App() {
           setGuatequeCoords(guatequeData);
         }
       } catch (error) {
-        console.warn(
-          'Error cargando coordenadas (usando datos locales):',
-          error,
-        );
+        console.warn('Error cargando coordenadas (usando datos locales):', error);
         // Ya están los datos locales por defecto
       } finally {
         // La vista usa las coordenadas locales mientras la API responde.
@@ -257,13 +264,11 @@ export default function App() {
               discoteca={banana}
               title={banana.nombre}
               selected={selectedMarkerSlug === banana.slug}
+              hasAlerts={bananaAlerts.length > 0}
+              eventImage={bananaEventImage ?? undefined}
               onPress={() => handleMarkerPress(banana)}
             >
-              <DiscotecaMarker
-                nombre={banana.nombre}
-                color={banana.color}
-                selected={selectedMarkerSlug === banana.slug}
-              />
+              <DiscotecaMarker nombre={banana.nombre} color={banana.color} selected={selectedMarkerSlug === banana.slug} />
             </MarkerComponent>
           )}
 
@@ -276,30 +281,31 @@ export default function App() {
               discoteca={guateque}
               title={guateque.nombre}
               selected={selectedMarkerSlug === guateque.slug}
+              hasAlerts={guatequeAlerts.length > 0}
+              eventImage={guatequeEventImage ?? undefined}
               onPress={() => handleMarkerPress(guateque)}
             >
-              <DiscotecaMarker
-                nombre={guateque.nombre}
-                color={guateque.color}
-                selected={selectedMarkerSlug === guateque.slug}
-              />
+              <DiscotecaMarker nombre={guateque.nombre} color={guateque.color} selected={selectedMarkerSlug === guateque.slug} />
             </MarkerComponent>
           )}
         </MapViewComponent>
       </View>
 
       <View style={styles.header}>
-        <View style={styles.headerPill}>
-          <Text style={styles.headerTitle}>SALIMOS</Text>
-          <Text style={styles.headerSubtitle}>El Puerto de Santa María</Text>
-        </View>
+        <LinearGradient
+          colors={gradients.brand}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.headerBorder}
+        >
+          <View style={styles.headerPill}>
+            <Text style={styles.headerTitle}>SALIMOS</Text>
+            <Text style={styles.headerSubtitle}>El Puerto de Santa María</Text>
+          </View>
+        </LinearGradient>
       </View>
 
-      <FiltrosBar
-        opciones={FILTROS}
-        activos={filtros}
-        onToggle={toggleFiltro}
-      />
+      <FiltrosBar opciones={FILTROS} activos={filtros} onToggle={toggleFiltro} />
 
       {selectedPoint && (
         <PointCard
@@ -308,10 +314,7 @@ export default function App() {
           routeLoading={routeLoading}
           routeError={routeError}
           onSelectProfile={(profile) =>
-            calculateRoute(profile, {
-              latitude: selectedPoint.latitude,
-              longitude: selectedPoint.longitude,
-            })
+            calculateRoute(profile, { latitude: selectedPoint.latitude, longitude: selectedPoint.longitude })
           }
           onClearRoute={clearRoute}
           onClose={handleMapPress}
@@ -320,57 +323,39 @@ export default function App() {
 
       {selectedClub && (
         <View style={styles.card}>
-          <Image source={{ uri: selectedClub.imagen }} style={styles.image} />
+          <View style={styles.imageWrap}>
+            <Image source={{ uri: currentEventImage ?? selectedClub.imagen }} style={styles.image} />
+            <LinearGradient
+              colors={['transparent', colors.backgroundCard]}
+              style={styles.imageFade}
+              pointerEvents="none"
+            />
+          </View>
           <View style={styles.cardContent}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardNombre}>{selectedClub.nombre}</Text>
-              <View
-                style={[
-                  styles.ratingBadge,
-                  { backgroundColor: colors.neonYellow + '22' },
-                ]}
-              >
-                <Text style={[styles.ratingText, { color: colors.neonYellow }]}>
-                  ⭐ {selectedClub.rating.toFixed(1)}
-                </Text>
+              <View style={styles.ratingBadge}>
+                <Text style={styles.ratingText}>⭐ {selectedClub.rating.toFixed(1)}</Text>
               </View>
             </View>
 
-            <Text style={styles.direccion}>{selectedClub.direccion}</Text>
+            <Text style={styles.direccion}>📍 {selectedClub.direccion}</Text>
 
             <View style={styles.tags}>
-              <View
-                style={[
-                  styles.tag,
-                  {
-                    backgroundColor: selectedClub.color + '22',
-                    borderColor: selectedClub.color + '55',
-                  },
-                ]}
-              >
-                <Text style={[styles.tagText, { color: selectedClub.color }]}>
-                  {selectedClub.genero}
-                </Text>
+              <View style={[styles.tag, { backgroundColor: selectedClub.color + '22', borderColor: selectedClub.color + '55' }]}>
+                <Text style={[styles.tagText, { color: selectedClub.color }]}>{selectedClub.genero}</Text>
               </View>
-              <View
-                style={[
-                  styles.tag,
-                  {
-                    backgroundColor: colors.neonGreen + '22',
-                    borderColor: colors.neonGreen + '55',
-                  },
-                ]}
-              >
-                <Text style={[styles.tagText, { color: colors.neonGreen }]}>
-                  💶 {selectedClub.precioEntrada}€
-                </Text>
+              <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
+                <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {selectedClub.precioEntrada}€</Text>
+              </View>
+              <View style={styles.tag}>
+                <Text style={styles.tagTextMuted}>🕐 {selectedClub.horario}</Text>
               </View>
             </View>
 
-            <Text style={styles.horario}>🕐 {selectedClub.horario}</Text>
-            <Text style={styles.descripcion} numberOfLines={2}>
-              {selectedClub.descripcion}
-            </Text>
+            <Text style={styles.descripcion} numberOfLines={2}>{selectedClub.descripcion}</Text>
+
+            <View style={styles.divider} />
 
             <AlertsPanel slug={selectedClub.slug} />
 
@@ -379,21 +364,20 @@ export default function App() {
               loading={routeLoading}
               error={routeError}
               onSelectProfile={(profile) =>
-                calculateRoute(profile, {
-                  latitude: selectedClub.latitud,
-                  longitude: selectedClub.longitud,
-                })
+                calculateRoute(profile, { latitude: selectedClub.latitud, longitude: selectedClub.longitud })
               }
               onClear={clearRoute}
             />
 
-            <TouchableOpacity
-              style={styles.eventosButton}
-              onPress={() => openEventos(selectedClub)}
-            >
-              <Text style={styles.eventosButtonText}>
-                📅 Ver próximos eventos
-              </Text>
+            <TouchableOpacity onPress={() => openEventos(selectedClub)} activeOpacity={0.85}>
+              <LinearGradient
+                colors={gradients.brand}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.eventosButton}
+              >
+                <Text style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
         </View>
@@ -424,34 +408,36 @@ const styles = StyleSheet.create({
   },
   header: {
     position: 'absolute',
-    top: 60,
+    top: 56,
     left: 16,
     right: 16,
     alignItems: 'center',
   },
+  headerBorder: {
+    borderRadius: 19,
+    padding: 1.5,
+    shadowColor: colors.brandPink,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 14,
+    elevation: 8,
+  },
   headerPill: {
-    backgroundColor: colors.background + 'CC',
-    borderRadius: 16,
-    paddingHorizontal: 20,
-    paddingVertical: 8,
+    backgroundColor: colors.background + 'F0',
+    borderRadius: 17.5,
+    paddingHorizontal: 22,
+    paddingVertical: 9,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 6,
   },
   headerTitle: {
     color: colors.textPrimary,
-    fontSize: 22,
-    fontWeight: 'bold',
-    letterSpacing: 1,
+    fontSize: 20,
+    fontWeight: '800',
+    letterSpacing: 2,
   },
   headerSubtitle: {
-    color: colors.neonPink,
-    fontSize: 12,
+    color: colors.textSecondary,
+    fontSize: 11.5,
     fontWeight: '600',
     marginTop: 2,
   },
@@ -461,88 +447,113 @@ const styles = StyleSheet.create({
     left: 16,
     right: 16,
     backgroundColor: colors.backgroundCard,
-    borderRadius: 16,
+    borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: colors.borderLight,
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.5,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowRadius: 18,
+    elevation: 16,
+  },
+  imageWrap: {
+    position: 'relative',
   },
   image: {
     width: '100%',
-    height: 120,
+    height: 130,
+  },
+  imageFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 36,
   },
   cardContent: {
-    padding: 16,
+    padding: 18,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   cardNombre: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: 'bold',
+    fontSize: 21,
+    fontWeight: '800',
     flex: 1,
     marginRight: 8,
+    letterSpacing: 0.2,
   },
   ratingBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 10,
     borderWidth: 1,
+    backgroundColor: colors.neonYellow + '1F',
     borderColor: colors.neonYellow + '55',
   },
   ratingText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
+    color: colors.neonYellow,
   },
   direccion: {
     color: colors.textSecondary,
-    fontSize: 14,
-    marginBottom: 12,
+    fontSize: 13.5,
+    marginBottom: 14,
   },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 12,
+    marginBottom: 14,
   },
   tag: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.backgroundLight,
   },
   tagText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
-  horario: {
+  tagTextMuted: {
+    fontSize: 12,
+    fontWeight: '600',
     color: colors.textSecondary,
-    fontSize: 13,
-    marginBottom: 8,
   },
   descripcion: {
     color: colors.textMuted,
     fontSize: 13,
-    lineHeight: 18,
-    marginBottom: 12,
+    lineHeight: 19,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginTop: 16,
   },
   eventosButton: {
-    backgroundColor: colors.neonPink,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: 15,
+    paddingVertical: 15,
     alignItems: 'center',
+    marginTop: 16,
+    shadowColor: colors.brandPink,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
   eventosButtonText: {
-    color: colors.textPrimary,
+    color: '#ffffff',
     fontSize: 15,
-    fontWeight: 'bold',
+    fontWeight: '800',
+    letterSpacing: 0.2,
   },
 });
