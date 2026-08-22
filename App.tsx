@@ -1,13 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Image,
-  ActivityIndicator,
-} from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { colors } from './src/theme/colors';
 import { discotecas } from './src/data/discotecas';
 import { Discoteca } from './src/types/discoteca';
@@ -27,11 +20,7 @@ import {
   fetchDiscotecaCoordinates,
   DiscotecaCoordinates,
 } from './src/services/eventosApi';
-import {
-  paradasTaxi,
-  RADIO_TAXI_NOMBRE,
-  RADIO_TAXI_TELEFONO,
-} from './src/data/taxis';
+import { paradasTaxi, RADIO_TAXI_TELEFONO } from './src/data/taxis';
 import { sitios } from './src/data/sitios';
 import { SitioCategoria } from './src/types/sitio';
 
@@ -267,7 +256,6 @@ export default function App() {
               }}
               discoteca={banana}
               title={banana.nombre}
-              tracksViewChanges={false}
               selected={selectedMarkerSlug === banana.slug}
               onPress={() => handleMarkerPress(banana)}
             >
@@ -287,7 +275,6 @@ export default function App() {
               }}
               discoteca={guateque}
               title={guateque.nombre}
-              tracksViewChanges={false}
               selected={selectedMarkerSlug === guateque.slug}
               onPress={() => handleMarkerPress(guateque)}
             >

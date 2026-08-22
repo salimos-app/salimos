@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -48,22 +48,22 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadEventos();
-  }, [discoteca.slug]);
-
-  const loadEventos = async () => {
+  const loadEventos = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
       const data = await fetchProximosEventos(discoteca.slug);
       setEventos(data);
-    } catch (err) {
+    } catch {
       setError('No se pudieron cargar los próximos eventos.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [discoteca.slug]);
+
+  useEffect(() => {
+    loadEventos();
+  }, [loadEventos]);
 
   const renderEvento = ({ item }: { item: Evento }) => {
     const fecha = formatFecha(item.startDate);

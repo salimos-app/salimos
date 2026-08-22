@@ -116,7 +116,7 @@ function attachAlertsSocket(server) {
       broadcast(slug, { type: 'alerts:expired', slug, alertId: alert.id });
     });
   }, SWEEP_INTERVAL_MS);
-  sweepInterval.unref?.();
+  sweepInterval.unref();
 
   return wss;
 }

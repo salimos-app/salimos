@@ -1,17 +1,3 @@
-export interface Coordinates {
-  latitude: number;
-  longitude: number;
-}
-
-export interface Address {
-  streetAddress: string;
-}
-
-export interface Location {
-  name: string;
-  address: Address;
-}
-
 export interface Region {
   latitude: number;
   longitude: number;
@@ -33,23 +19,4 @@ export interface Discoteca {
   horario: string;
   imagen: string;
   color: string;
-  coordinates?: Coordinates;
-  location?: Location;
-}
-
-export interface DiscotecaSummary {
-  id: string;
-  nombre: string;
-  slug: string;
-  genero: string;
-  rating: number;
-  precioEntrada: number;
-  imagen: string;
-}
-
-export interface DiscotecaFilters {
-  genero?: string;
-  precioMaximo?: number;
-  ratingMinimo?: number;
-  nombre?: string;
 }

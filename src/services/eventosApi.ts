@@ -1,23 +1,64 @@
-import { Evento } from '../types/evento';
+import { Evento, Location } from '../types/evento';
 import { getApiBaseUrls } from '../config/api';
 
-function normalizeEventos(payload: any): Evento[] {
+function normalizeEventos(payload: unknown): Evento[] {
+  if (typeof payload !== 'object' || payload === null) {
+    return [];
+  }
+
+  const p = payload as Record<string, unknown>;
   const rawList =
-    payload?.data?.itemListElement ?? payload?.itemListElement ?? [];
+    (p?.data as Record<string, unknown> | undefined)?.itemListElement ??
+    (p?.itemListElement as unknown[] | undefined) ??
+    [];
+
+  if (!Array.isArray(rawList)) {
+    return [];
+  }
 
   return rawList
-    .map((entry: any) => entry?.item ?? entry)
-    .filter((item: any) => item && typeof item === 'object' && item.name)
-    .map((item: any) => ({
-      name: item.name,
-      startDate: item.startDate,
-      endDate: item.endDate,
-      url: item.url,
-      location: item.location ?? {
-        name: 'Sin ubicación',
-        address: { streetAddress: '' },
-      },
-    }));
+    .map((entry) => {
+      if (typeof entry !== 'object' || entry === null) return null;
+      const e = entry as Record<string, unknown>;
+      return e?.item ?? entry;
+    })
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item !== null &&
+        typeof item === 'object' &&
+        'name' in item &&
+        typeof (item as Record<string, unknown>).name === 'string',
+    )
+    .map((item): Evento => {
+      const location = item.location as Record<string, unknown> | undefined;
+      const parsedLocation: Location = location
+        ? {
+            name:
+              typeof location.name === 'string'
+                ? location.name
+                : 'Sin ubicación',
+            address: {
+              streetAddress:
+                typeof (location.address as Record<string, unknown> | undefined)
+                  ?.streetAddress === 'string'
+                  ? ((location.address as Record<string, unknown>)
+                      .streetAddress as string)
+                  : '',
+            },
+          }
+        : {
+            name: 'Sin ubicación',
+            address: { streetAddress: '' },
+          };
+
+      return {
+        name: item.name as string,
+        startDate: typeof item.startDate === 'string' ? item.startDate : '',
+        endDate: typeof item.endDate === 'string' ? item.endDate : '',
+        url: typeof item.url === 'string' ? item.url : '',
+        location: parsedLocation,
+      };
+    });
 }
 
 export interface DiscotecaCoordinates {

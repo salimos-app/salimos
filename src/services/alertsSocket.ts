@@ -38,7 +38,7 @@ function send(message: Record<string, unknown>): void {
 }
 
 function handleMessage(raw: string): void {
-  let message: any;
+  let message: unknown;
   try {
     message = JSON.parse(raw);
   } catch (error) {
@@ -46,33 +46,39 @@ function handleMessage(raw: string): void {
     return;
   }
 
-  switch (message?.type) {
+  if (typeof message !== 'object' || message === null) {
+    return;
+  }
+
+  const msg = message as Record<string, unknown>;
+  switch (msg?.type) {
     case 'catalog': {
-      catalog = message.alertTypes ?? [];
+      catalog = (msg.alertTypes ?? []) as AlertType[];
       catalogListeners.forEach((listener) => listener(catalog));
       break;
     }
     case 'alerts:sync': {
       const room = new Map<string, DiscotecaAlert>();
-      (message.alerts ?? []).forEach((alert: DiscotecaAlert) =>
+      ((msg.alerts ?? []) as DiscotecaAlert[]).forEach((alert) =>
         room.set(alert.id, alert),
       );
-      alertsBySlug.set(message.slug, room);
-      notifySlug(message.slug);
+      alertsBySlug.set(msg.slug as string, room);
+      notifySlug(msg.slug as string);
       break;
     }
     case 'alerts:update': {
       const room =
-        alertsBySlug.get(message.slug) ?? new Map<string, DiscotecaAlert>();
-      room.set(message.alert.id, message.alert);
-      alertsBySlug.set(message.slug, room);
-      notifySlug(message.slug);
+        alertsBySlug.get(msg.slug as string) ??
+        new Map<string, DiscotecaAlert>();
+      room.set((msg.alert as DiscotecaAlert).id, msg.alert as DiscotecaAlert);
+      alertsBySlug.set(msg.slug as string, room);
+      notifySlug(msg.slug as string);
       break;
     }
     case 'alerts:expired': {
-      const room = alertsBySlug.get(message.slug);
-      if (room?.delete(message.alertId)) {
-        notifySlug(message.slug);
+      const room = alertsBySlug.get(msg.slug as string);
+      if (room?.delete(msg.alertId as string)) {
+        notifySlug(msg.slug as string);
       }
       break;
     }
