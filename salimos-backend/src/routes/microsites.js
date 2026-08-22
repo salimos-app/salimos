@@ -44,4 +44,47 @@ router.get('/:slug/metadata', async (req, res) => {
   }
 });
 
+const NINETY_DAYS_SECONDS = 90 * 24 * 60 * 60;
+
+/**
+ * Eventos con imagen. A diferencia de /metadata (feed schema.org sin
+ * imágenes), este pega contra /api/events de Fourvenues, que sí devuelve
+ * `image` por evento.
+ */
+router.get('/:slug/events', async (req, res) => {
+  try {
+    const startDate = Math.floor(Date.now() / 1000);
+    const endDate = startDate + NINETY_DAYS_SECONDS;
+
+    const events = [];
+    let page = 1;
+    let totalPages = 1;
+
+    do {
+      const query = new URLSearchParams({
+        slug: req.params.slug,
+        startDate: String(startDate),
+        endDate: String(endDate),
+        page: String(page),
+      });
+
+      const { statusCode, body } = await fetchFromFourvenues(`/api/events?${query}`);
+
+      if (statusCode !== 200) {
+        res.status(statusCode).type('application/json; charset=utf-8').send(body);
+        return;
+      }
+
+      const parsed = JSON.parse(body);
+      events.push(...(parsed.data ?? []));
+      totalPages = parsed.metadata?.totalPages ?? 1;
+      page += 1;
+    } while (page <= totalPages);
+
+    res.json({ data: events });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
 module.exports = router;

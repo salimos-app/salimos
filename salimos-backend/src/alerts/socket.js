@@ -25,19 +25,28 @@ function attachAlertsSocket(server) {
   // slug -> Set<WebSocket>
   const rooms = new Map();
 
+  // Cada conexión puede estar suscrita a varias discotecas a la vez (p.ej.
+  // la app se suscribe a todas las que tiene pines en el mapa para saber
+  // cuáles tienen alertas activas, no solo a la seleccionada).
   function joinRoom(ws, slug) {
-    leaveRoom(ws);
     if (!rooms.has(slug)) {
       rooms.set(slug, new Set());
     }
     rooms.get(slug).add(ws);
-    ws.discotecaSlug = slug;
+    if (!ws.discotecaSlugs) ws.discotecaSlugs = new Set();
+    ws.discotecaSlugs.add(slug);
   }
 
-  function leaveRoom(ws) {
-    if (!ws.discotecaSlug) return;
-    rooms.get(ws.discotecaSlug)?.delete(ws);
-    ws.discotecaSlug = null;
+  function leaveRoom(ws, slug) {
+    rooms.get(slug)?.delete(ws);
+    ws.discotecaSlugs?.delete(slug);
+  }
+
+  function leaveAllRooms(ws) {
+    for (const slug of ws.discotecaSlugs ?? []) {
+      rooms.get(slug)?.delete(ws);
+    }
+    ws.discotecaSlugs?.clear();
   }
 
   function send(ws, message) {
@@ -77,7 +86,11 @@ function attachAlertsSocket(server) {
           break;
         }
         case 'unsubscribe': {
-          leaveRoom(ws);
+          if (typeof message.slug === 'string' && message.slug) {
+            leaveRoom(ws, message.slug);
+          } else {
+            leaveAllRooms(ws);
+          }
           break;
         }
         case 'report': {
@@ -95,7 +108,7 @@ function attachAlertsSocket(server) {
       }
     });
 
-    ws.on('close', () => leaveRoom(ws));
+    ws.on('close', () => leaveAllRooms(ws));
   });
 
   const sweepInterval = setInterval(() => {
