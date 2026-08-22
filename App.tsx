@@ -7,6 +7,9 @@ import { Discoteca } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
+import AlertsPanel from './src/components/AlertsPanel';
+import RoutePanel from './src/components/RoutePanel';
+import { useRoute } from './src/hooks/useRoute';
 import { fetchDiscotecaCoordinates, DiscotecaCoordinates } from './src/services/eventosApi';
 
 const banana: Discoteca = discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
@@ -32,6 +35,7 @@ export default function App() {
   // Inicializa con los datos locales para que la app se muestre al instante
   const [bananaCoords, setBananaCoords] = useState<DiscotecaCoordinates>(defaultBananaCoords);
   const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(defaultGuatequeCoords);
+  const { route, loading: routeLoading, error: routeError, calculateRoute, clearRoute } = useRoute();
 
   const selectedClub = selectedMarkerSlug
     ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
@@ -73,11 +77,13 @@ export default function App() {
   const handleMarkerPress = (discoteca: Discoteca) => {
     setSelectedMarkerSlug(discoteca.slug);
     setSelectedDiscoteca(null);
+    clearRoute();
   };
 
   const handleMapPress = () => {
     setSelectedMarkerSlug(null);
     setSelectedDiscoteca(null);
+    clearRoute();
   };
 
   const openEventos = (discoteca: Discoteca) => {
@@ -113,6 +119,7 @@ export default function App() {
             longitudeDelta: 0.05,
           }}
           onPress={handleMapPress}
+          routeCoordinates={route?.coordinates}
         >
           <MarkerComponent
             coordinate={{
@@ -175,6 +182,18 @@ export default function App() {
 
             <Text style={styles.horario}>🕐 {selectedClub.horario}</Text>
             <Text style={styles.descripcion} numberOfLines={2}>{selectedClub.descripcion}</Text>
+
+            <AlertsPanel slug={selectedClub.slug} />
+
+            <RoutePanel
+              route={route}
+              loading={routeLoading}
+              error={routeError}
+              onSelectProfile={(profile) =>
+                calculateRoute(profile, { latitude: selectedClub.latitud, longitude: selectedClub.longitud })
+              }
+              onClear={clearRoute}
+            />
 
             <TouchableOpacity style={styles.eventosButton} onPress={() => openEventos(selectedClub)}>
               <Text style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>

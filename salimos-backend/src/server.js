@@ -1,8 +1,11 @@
+const http = require('http');
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const morgan = require('morgan');
 const config = require('./config');
 const micrositesRouter = require('./routes/microsites');
+const directionsRouter = require('./routes/directions');
+const { attachAlertsSocket } = require('./alerts/socket');
 
 const app = express();
 
@@ -30,7 +33,7 @@ app.use(
 app.get('/', (req, res) => {
   res.json({
     message: 'Salimos backend está funcionando',
-    endpoints: ['/api/microsites/:slug/metadata', '/api/health'],
+    endpoints: ['/api/microsites/:slug/metadata', '/api/directions/:profile', '/api/health', 'ws:/ws'],
     status: 'ok',
   });
 });
@@ -40,11 +43,15 @@ app.get('/api/health', (req, res) => {
 });
 
 app.use('/api/microsites', micrositesRouter);
+app.use('/api/directions', directionsRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });
 });
 
-app.listen(config.port, '0.0.0.0', () => {
-  console.log(`Salimos backend escuchando en el puerto ${config.port}`);
+const server = http.createServer(app);
+attachAlertsSocket(server);
+
+server.listen(config.port, '0.0.0.0', () => {
+  console.log(`Salimos backend escuchando en el puerto ${config.port} (HTTP + WebSocket /ws)`);
 });

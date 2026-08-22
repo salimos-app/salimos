@@ -15,3 +15,5 @@ services:
         value: cli-api-service.fourvenues.com
       - key: FOURVENUES_API_TOKEN
         sync: false
+      - key: ORS_API_KEY
+        sync: false

@@ -4,6 +4,7 @@
   "main": "expo/AppEntry",
   "dependencies": {
     "expo": "~57.0.13",
+    "expo-location": "~57.0.10",
     "expo-status-bar": "~57.0.1",
     "leaflet": "^1.9.4",
     "react": "19.2.3",

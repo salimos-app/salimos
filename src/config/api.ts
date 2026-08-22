@@ -43,3 +43,10 @@ export function getApiBaseUrl(): string {
 export function getProxyUrl(endpoint: string): string {
   return `${getApiBaseUrl()}${endpoint}`;
 }
+
+/**
+ * Obtiene la URL del WebSocket de alertas (ws:// o wss:// según corresponda).
+ */
+export function getWsUrl(): string {
+  return `${getApiBaseUrl().replace(/^http/, 'ws')}/ws`;
+}

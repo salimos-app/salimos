@@ -14,4 +14,8 @@ module.exports = {
     host: process.env.FOURVENUES_API_HOST || 'cli-api-service.fourvenues.com',
     token: apiToken,
   },
+  // Opcional: sin ella /api/directions responde 500 pero el resto del backend funciona.
+  ors: {
+    apiKey: process.env.ORS_API_KEY || null,
+  },
 };

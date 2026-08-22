@@ -23,10 +23,23 @@ interface MapViewProps {
   onRegionChangeComplete?: (region: Region) => void;
   onPress?: () => void;
   customMapStyle?: any[];
+  /** Puntos [latitud, longitud] de una ruta a dibujar sobre el mapa. */
+  routeCoordinates?: [number, number][];
+  routeColor?: string;
   ref?: any;
 }
 
-export function MapViewComponent({ children, style, initialRegion, region, onRegionChangeComplete, onPress, customMapStyle }: MapViewProps) {
+export function MapViewComponent({
+  children,
+  style,
+  initialRegion,
+  region,
+  onRegionChangeComplete,
+  onPress,
+  customMapStyle,
+  routeCoordinates,
+  routeColor = '#00E5FF',
+}: MapViewProps) {
   if (Platform.OS === 'web') {
     const center = region || initialRegion;
     const markers = React.Children.toArray(children).filter((child: any) => {
@@ -39,6 +52,7 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
     const TileLayer = require('react-leaflet').TileLayer;
     const Marker = require('react-leaflet').Marker;
     const Popup = require('react-leaflet').Popup;
+    const Polyline = require('react-leaflet').Polyline;
     const L = require('leaflet');
     require('leaflet/dist/leaflet.css');
 
@@ -132,6 +146,10 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
               </Marker>
             );
           })}
+
+          {routeCoordinates && routeCoordinates.length > 1 && (
+            <Polyline positions={routeCoordinates} pathOptions={{ color: routeColor, weight: 4 }} />
+          )}
         </MapContainer>
       </View>
     );
@@ -156,9 +174,11 @@ export function MapViewComponent({ children, style, initialRegion, region, onReg
 <style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}.club-image{width:100%;height:32px;background-position:center;background-size:cover}.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}</style></head>
 <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
+const route=${JSON.stringify(routeCoordinates ?? []).replace(/</g, '\\u003c')};
 const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+';--club-color:'+item.color+'"><div class="club-image" style="background-image:url(&quot;'+item.image+'&quot;)" ></div><div class="club-name">'+item.title+'</div></div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
+if(route.length>1){const line=L.polyline(route,{color:'${routeColor}',weight:4}).addTo(map);map.fitBounds(line.getBounds(),{padding:[40,40]});}
 map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
 </script></body></html>`;
 
