@@ -15,6 +15,22 @@ interface MarkerProps {
   selected?: boolean;
 }
 
+/** Punto genérico en el mapa (paradas de taxi, bares, supermercados...). */
+export interface SimpleMapPoint {
+  id: string;
+  latitude: number;
+  longitude: number;
+  label: string;
+  sublabel?: string;
+  icon?: string;
+  /** Color de fondo del pin, para agrupar visualmente por categoría. */
+  color?: string;
+  /** Categoría (taxi, bar, pub, supermarket, convenience...) para lógica específica en la UI. */
+  kind?: string;
+  /** Teléfono de contacto, si lo tiene (p.ej. paradas de taxi → botón de llamar). */
+  phone?: string;
+}
+
 interface MapViewProps {
   children?: React.ReactNode;
   style?: any;
@@ -26,6 +42,10 @@ interface MapViewProps {
   /** Puntos [latitud, longitud] de una ruta a dibujar sobre el mapa. */
   routeCoordinates?: [number, number][];
   routeColor?: string;
+  /** Puntos genéricos (no discotecas) a marcar en el mapa. */
+  points?: SimpleMapPoint[];
+  /** Se llama al tocar uno de `points` (abre la tarjeta correspondiente en la app). */
+  onPointPress?: (point: SimpleMapPoint) => void;
   ref?: any;
 }
 
@@ -39,6 +59,8 @@ export function MapViewComponent({
   customMapStyle,
   routeCoordinates,
   routeColor = '#00E5FF',
+  points = [],
+  onPointPress,
 }: MapViewProps) {
   if (Platform.OS === 'web') {
     const center = region || initialRegion;
@@ -107,6 +129,26 @@ export function MapViewComponent({
         popupAnchor: [0, -52],
       });
 
+    const simplePointIcon = (icon: string, color?: string) =>
+      L.divIcon({
+        className: '',
+        html: `<div style="
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background: ${color ?? 'rgba(12, 10, 22, 0.94)'};
+          border: 2px solid #ffffff;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 15px;
+          box-shadow: 0 4px 10px rgba(0,0,0,.4);
+        ">${icon}</div>`,
+        iconSize: [30, 30],
+        iconAnchor: [15, 15],
+        popupAnchor: [0, -15],
+      });
+
     return (
       <View style={[styles.webMap, style]}>
         <MapContainer
@@ -147,6 +189,15 @@ export function MapViewComponent({
             );
           })}
 
+          {points.map((point) => (
+            <Marker
+              key={point.id}
+              position={[point.latitude, point.longitude]}
+              icon={simplePointIcon(point.icon ?? '📍', point.color)}
+              eventHandlers={{ click: () => onPointPress?.(point) }}
+            />
+          ))}
+
           {routeCoordinates && routeCoordinates.length > 1 && (
             <Polyline positions={routeCoordinates} pathOptions={{ color: routeColor, weight: 4 }} />
           )}
@@ -171,13 +222,15 @@ export function MapViewComponent({
   const mapHtml = `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}.club-image{width:100%;height:32px;background-position:center;background-size:cover}.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}</style></head>
+<style>html,body,#map{height:100%;margin:0;background:#dfe8f6}.club{display:inline-flex;flex-direction:column;align-items:stretch;width:92px;transform:translateX(-50%);overflow:hidden;border:2px solid #fff;border-radius:14px;background:rgba(12,10,22,.96);color:#fff;font:bold 11px sans-serif;white-space:nowrap;box-shadow:0 4px 12px #0008;text-align:center}.club-image{width:100%;height:32px;background-position:center;background-size:cover}.club-name{padding:5px 6px;overflow:hidden;text-overflow:ellipsis;background:linear-gradient(180deg,var(--club-color),rgba(12,10,22,.96));}.simple-point{width:30px;height:30px;border-radius:50%;background:rgba(12,10,22,.94);border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 4px 10px #0006}</style></head>
 <body><div id="map"></div><script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script><script>
 const markers=${JSON.stringify(markerData).replace(/</g, '\\u003c')};
 const route=${JSON.stringify(routeCoordinates ?? []).replace(/</g, '\\u003c')};
+const points=${JSON.stringify(points).replace(/</g, '\\u003c')};
 const map=L.map('map',{zoomControl:true}).setView([${center?.latitude ?? 36.5982},${center?.longitude ?? -6.2242}],13);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap contributors'}).addTo(map);
 markers.forEach(item=>{const icon=L.divIcon({className:'',html:'<div class="club" style="border-color:'+item.color+';--club-color:'+item.color+'"><div class="club-image" style="background-image:url(&quot;'+item.image+'&quot;)" ></div><div class="club-name">'+item.title+'</div></div>',iconAnchor:[0,20]});L.marker([item.latitude,item.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index})));});
+points.forEach(p=>{const icon=L.divIcon({className:'',html:'<div class="simple-point" style="background:'+(p.color||'rgba(12,10,22,.94)')+'">'+(p.icon||'📍')+'</div>',iconSize:[30,30],iconAnchor:[15,15],popupAnchor:[0,-15]});L.marker([p.latitude,p.longitude],{icon}).addTo(map).on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:p.id})));});
 if(route.length>1){const line=L.polyline(route,{color:'${routeColor}',weight:4}).addTo(map);map.fitBounds(line.getBounds(),{padding:[40,40]});}
 map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
 </script></body></html>`;
@@ -194,6 +247,9 @@ map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'m
           const message = JSON.parse(event.nativeEvent.data);
           if (message.type === 'marker' && markers[message.index]?.props.onPress) {
             markers[message.index].props.onPress?.();
+          } else if (message.type === 'point') {
+            const point = points.find((p) => p.id === message.id);
+            if (point) onPointPress?.(point);
           } else if (message.type === 'map') {
             onPress?.();
           }
