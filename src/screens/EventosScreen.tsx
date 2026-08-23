@@ -101,6 +101,11 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
     [eventos, selectedDay]
   );
 
+  // El primer evento del día seleccionado se destaca grande debajo del
+  // calendario; si ese día tiene más de uno, el resto va en la lista.
+  const eventoDestacado = eventosDelDia[0] ?? null;
+  const restoDelDia = eventosDelDia.slice(1);
+
   const renderEvento = ({ item }: { item: Evento }) => {
     const fecha = formatFecha(item.startDate);
     return (
@@ -207,15 +212,44 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
           )}
 
           <FlatList
-            data={eventosDelDia}
+            data={restoDelDia}
             keyExtractor={(item, index) => `${item.name}-${index}`}
             renderItem={renderEvento}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            ListHeaderComponent={
+              eventoDestacado ? (
+                <View style={styles.heroCard}>
+                  {eventoDestacado.image ? (
+                    <Image source={{ uri: eventoDestacado.image }} style={styles.heroImagen} resizeMode="cover" />
+                  ) : (
+                    <View style={styles.heroImagenPlaceholder}>
+                      <Text style={styles.heroImagenPlaceholderText}>
+                        {eventoDestacado.name.charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <LinearGradient
+                    colors={['transparent', 'rgba(10,8,16,0.92)']}
+                    style={styles.heroFade}
+                    pointerEvents="none"
+                  />
+                  <View style={styles.heroInfo}>
+                    <Text style={styles.heroNombre}>{eventoDestacado.name}</Text>
+                    <View style={styles.heroDetalle}>
+                      <Text style={styles.heroHora}>🕐 {formatHora(eventoDestacado.startDate)}</Text>
+                      <Text style={styles.heroUbicacion}>📍 {eventoDestacado.location.name}</Text>
+                    </View>
+                  </View>
+                </View>
+              ) : null
+            }
             ListEmptyComponent={
-              <View style={styles.centerContainer}>
-                <Text style={styles.emptyText}>No hay próximos eventos</Text>
-              </View>
+              eventoDestacado ? null : (
+                <View style={styles.centerContainer}>
+                  <Text style={styles.emptyText}>No hay próximos eventos</Text>
+                </View>
+              )
             }
           />
         </>
@@ -359,6 +393,72 @@ const styles = StyleSheet.create({
   listContent: {
     padding: 16,
     paddingBottom: 32,
+  },
+  heroCard: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    height: 300,
+    marginBottom: 18,
+    backgroundColor: colors.backgroundLight,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 10,
+  },
+  heroImagen: {
+    width: '100%',
+    height: '100%',
+  },
+  heroImagenPlaceholder: {
+    width: '100%',
+    height: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundLight,
+  },
+  heroImagenPlaceholderText: {
+    color: colors.textMuted,
+    fontSize: 64,
+    fontWeight: '800',
+  },
+  heroFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: 150,
+  },
+  heroInfo: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    padding: 18,
+  },
+  heroNombre: {
+    color: '#ffffff',
+    fontSize: 21,
+    fontWeight: '800',
+    marginBottom: 8,
+    letterSpacing: 0.2,
+  },
+  heroDetalle: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 14,
+  },
+  heroHora: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  heroUbicacion: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 13,
+    fontWeight: '700',
   },
   eventoCard: {
     flexDirection: 'row',
