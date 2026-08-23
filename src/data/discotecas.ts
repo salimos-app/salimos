@@ -21,10 +21,10 @@ export const discotecas: Discoteca[] = [
     id: '2',
     nombre: 'GUATEQUE',
     slug: 'guateque',
-    direccion: 'Calle de la Ribera, 18, El Puerto de Santa María (Cádiz)',
+    direccion: 'Calle Bajada del Castillo, 11500 El Puerto de Santa María (Cádiz)',
     descripcion: 'Discoteca con ambiente intenso, música comercial y sesiones de electrónica para la última hora del viernes y sábado.',
-    latitud: 36.5971,
-    longitud: -6.2249,
+    latitud: 36.59627,
+    longitud: -6.22603,
     genero: 'Electrónica / Comercial',
     precioEntrada: 18,
     rating: 4.6,
@@ -32,10 +32,12 @@ export const discotecas: Discoteca[] = [
     imagen: 'https://images.unsplash.com/photo-1516280440614-37939bbacd81?w=400',
     color: colors.neonYellow,
   },
-  // Las dos siguientes no tienen ficha en Fourvenues (sin eventos/fotos en
-  // vivo): salen del mapa de OpenStreetMap © OpenStreetMap contributors
-  // (amenity=nightclub cerca de El Puerto de Santa María), sin precio,
-  // rating ni horario porque no tenemos esos datos confirmados.
+  // Las siguientes no tienen ficha en Fourvenues conectada (sin
+  // eventos/fotos en vivo): Los Milagros y Phi Phi Beach salen de
+  // OpenStreetMap © OpenStreetMap contributors (amenity=nightclub cerca de
+  // El Puerto de Santa María); GOLD y Sala New Palace, de Google Maps. Sin
+  // precio ni horario porque no son datos confirmados, no se inventan
+  // (el rating de GOLD/Sala New Palace sí es real, de Google Maps).
   {
     id: '3',
     nombre: 'Los Milagros',
@@ -59,5 +61,31 @@ export const discotecas: Discoteca[] = [
     genero: 'Discoteca',
     imagen: 'https://images.unsplash.com/photo-1517665884544-9366983cd8c3?w=400',
     color: colors.neonBlue,
+  },
+  {
+    id: '5',
+    nombre: 'GOLD',
+    slug: 'gold-santa-maria',
+    direccion: 'Av. Micaela Aramburu de Mora, 24, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5960236,
+    longitud: -6.2260532,
+    genero: 'Discoteca',
+    rating: 3.3,
+    imagen: 'https://images.unsplash.com/photo-1571266028243-d220c9a3c8e0?w=400',
+    color: colors.neonGreen,
+  },
+  {
+    id: '6',
+    nombre: 'Sala New Palace',
+    slug: 'sala-new-palace',
+    direccion: 'Juan Ignacio Varela Gilabert, s/n, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.607589,
+    longitud: -6.2323023,
+    genero: 'Discoteca',
+    rating: 4.1,
+    imagen: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400',
+    color: colors.neonPink,
   },
 ];
