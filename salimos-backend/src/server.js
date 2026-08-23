@@ -5,6 +5,7 @@ const morgan = require('morgan');
 const config = require('./config');
 const micrositesRouter = require('./routes/microsites');
 const directionsRouter = require('./routes/directions');
+const discotecasRouter = require('./routes/discotecas');
 const { attachAlertsSocket } = require('./alerts/socket');
 
 const app = express();
@@ -33,7 +34,14 @@ app.use(
 app.get('/', (req, res) => {
   res.json({
     message: 'Salimos backend está funcionando',
-    endpoints: ['/api/microsites/:slug/metadata', '/api/directions/:profile', '/api/health', 'ws:/ws'],
+    endpoints: [
+      '/api/discotecas',
+      '/api/microsites/:slug/metadata',
+      '/api/microsites/:slug/events',
+      '/api/directions/:profile',
+      '/api/health',
+      'ws:/ws',
+    ],
     status: 'ok',
   });
 });
@@ -44,6 +52,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/microsites', micrositesRouter);
 app.use('/api/directions', directionsRouter);
+app.use('/api/discotecas', discotecasRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

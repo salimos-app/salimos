@@ -3,8 +3,8 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients } from './src/theme/colors';
-import { discotecas } from './src/data/discotecas';
-import { Discoteca } from './src/types/discoteca';
+import { discotecas as discotecasSemilla } from './src/data/discotecas';
+import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
@@ -13,14 +13,27 @@ import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
 import FiltrosBar, { FiltroOpcion } from './src/components/FiltrosBar';
 import { useRoute } from './src/hooks/useRoute';
-import { useDiscotecaAlerts } from './src/hooks/useDiscotecaAlerts';
-import { fetchDiscotecaCoordinates, fetchProximosEventos, DiscotecaCoordinates } from './src/services/eventosApi';
+import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
+import {
+  fetchDiscotecas,
+  fetchDiscotecaCoordinates,
+  fetchProximosEventos,
+  DiscotecaCoordinates,
+} from './src/services/eventosApi';
 import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
 import { sitios } from './src/data/sitios';
 import { SitioCategoria } from './src/types/sitio';
 
-const banana: Discoteca = discotecas.find((d) => d.slug === 'banana') ?? discotecas[0];
-const guateque: Discoteca = discotecas.find((d) => d.slug === 'guateque') ?? discotecas[1];
+// Acento de color por discoteca: es un detalle puramente visual (no lo
+// manda el backend), se asigna por índice ciclando esta paleta.
+const DISCOTECA_COLOR_PALETTE = [colors.neonPink, colors.neonYellow, colors.neonPurple, colors.neonBlue, colors.neonGreen];
+
+function conColor(discotecas: DiscotecaSinColor[]): Discoteca[] {
+  return discotecas.map((discoteca, index) => ({
+    ...discoteca,
+    color: DISCOTECA_COLOR_PALETTE[index % DISCOTECA_COLOR_PALETTE.length],
+  }));
+}
 
 type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
 
@@ -70,21 +83,40 @@ const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
 
 const mapPoints: SimpleMapPoint[] = [...taxiPoints, ...sitioPoints];
 
-// Coordenadas locales por defecto (fallback inmediato si la API no responde)
-const defaultBananaCoords: DiscotecaCoordinates = {
-  latitude: banana.latitud,
-  longitude: banana.longitud,
-  nombre: banana.nombre,
-  direccion: banana.direccion,
-};
-const defaultGuatequeCoords: DiscotecaCoordinates = {
-  latitude: guateque.latitud,
-  longitude: guateque.longitud,
-  nombre: guateque.nombre,
-  direccion: guateque.direccion,
-};
+/** Coordenadas locales por defecto (fallback inmediato si la API no responde, o si la discoteca no tiene ficha en Fourvenues). */
+function coordsLocalesPorSlug(discotecas: Discoteca[]): Record<string, DiscotecaCoordinates> {
+  return Object.fromEntries(
+    discotecas.map((d) => [
+      d.slug,
+      { latitude: d.latitud, longitude: d.longitud, nombre: d.nombre, direccion: d.direccion },
+    ])
+  );
+}
+
+const discotecasSemillaConColor = conColor(discotecasSemilla);
 
 export default function App() {
+  // Arranca con la semilla local para que la app se muestre al instante; en
+  // cuanto responde el backend, `discotecas` pasa a ser el listado real de
+  // /api/discotecas (mismo shape, así que todo lo demás no se entera).
+  const [discotecas, setDiscotecas] = useState<Discoteca[]>(discotecasSemillaConColor);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchDiscotecas()
+      .then((data) => {
+        if (mounted) setDiscotecas(conColor(data));
+      })
+      .catch((error) => {
+        console.warn('Error cargando discotecas del backend (usando semilla local):', error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(null);
   const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
@@ -95,34 +127,33 @@ export default function App() {
     taxis: true,
   });
   // Inicializa con los datos locales para que la app se muestre al instante
-  const [bananaCoords, setBananaCoords] = useState<DiscotecaCoordinates>(defaultBananaCoords);
-  const [guatequeCoords, setGuatequeCoords] = useState<DiscotecaCoordinates>(defaultGuatequeCoords);
+  const [coordsBySlug, setCoordsBySlug] = useState<Record<string, DiscotecaCoordinates>>(() =>
+    coordsLocalesPorSlug(discotecasSemillaConColor)
+  );
   const { route, loading: routeLoading, error: routeError, calculateRoute, clearRoute } = useRoute();
+
+  const discotecaSlugs = useMemo(() => discotecas.map((d) => d.slug), [discotecas]);
 
   // Alertas en vivo por discoteca (estilo Waze), para el badge en el pin del
   // mapa: se suscriben siempre mientras el mapa está en pantalla, no solo
-  // cuando esa discoteca está seleccionada.
-  const { alerts: bananaAlerts } = useDiscotecaAlerts(banana.slug);
-  const { alerts: guatequeAlerts } = useDiscotecaAlerts(guateque.slug);
+  // cuando esa discoteca está seleccionada. Las que no tienen backend propio
+  // simplemente nunca reciben alertas (badge nunca se enciende).
+  const alertsBySlug = useAlertsForSlugs(discotecaSlugs);
 
   // Foto del próximo evento de cada discoteca: es lo más importante
   // visualmente del pin (reemplaza la inicial) y también se usa en la
   // tarjeta del mapa en vez de la foto genérica del local. Se piden para
-  // las dos discotecas siempre (no solo la seleccionada) para que los pines
-  // en el mapa ya se vean con la foto del evento sin necesidad de tocarlos.
-  const [bananaEventImage, setBananaEventImage] = useState<string | null>(null);
-  const [guatequeEventImage, setGuatequeEventImage] = useState<string | null>(null);
+  // todas las discotecas siempre (no solo la seleccionada) para que los
+  // pines en el mapa ya se vean con la foto del evento sin tocarlos. Las
+  // discotecas sin ficha en Fourvenues simplemente no consiguen foto y caen
+  // al pin genérico.
+  const [eventImageBySlug, setEventImageBySlug] = useState<Record<string, string | null>>({});
 
   const selectedClub = selectedMarkerSlug
     ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
     : null;
 
-  const currentEventImage =
-    selectedClub?.slug === banana.slug
-      ? bananaEventImage
-      : selectedClub?.slug === guateque.slug
-        ? guatequeEventImage
-        : null;
+  const currentEventImage = selectedClub ? eventImageBySlug[selectedClub.slug] ?? null : null;
 
   useEffect(() => {
     let mounted = true;
@@ -133,24 +164,23 @@ export default function App() {
     const primeraConFoto = (eventos: { image?: string }[]) =>
       eventos.find((evento) => evento.image)?.image ?? null;
 
-    fetchProximosEventos(banana.slug)
-      .then((eventos) => {
-        if (mounted) setBananaEventImage(primeraConFoto(eventos));
-      })
-      .catch(() => {
-        // Si falla, el pin y la tarjeta caen a la foto genérica del local.
-      });
-
-    fetchProximosEventos(guateque.slug)
-      .then((eventos) => {
-        if (mounted) setGuatequeEventImage(primeraConFoto(eventos));
-      })
-      .catch(() => {});
+    discotecas.forEach((discoteca) => {
+      fetchProximosEventos(discoteca.slug)
+        .then((eventos) => {
+          if (mounted) {
+            setEventImageBySlug((prev) => ({ ...prev, [discoteca.slug]: primeraConFoto(eventos) }));
+          }
+        })
+        .catch(() => {
+          // Sin ficha en Fourvenues (o falló la carga): el pin y la tarjeta
+          // caen a la foto genérica del local.
+        });
+    });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [discotecas]);
 
   const visiblePoints = useMemo(
     () => mapPoints.filter((point) => filtros[filtroDe(point)]),
@@ -160,30 +190,23 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    const loadCoordinates = async () => {
-      try {
-        const [bananaData, guatequeData] = await Promise.all([
-          fetchDiscotecaCoordinates('banana'),
-          fetchDiscotecaCoordinates('guateque'),
-        ]);
-        if (mounted) {
-          setBananaCoords(bananaData);
-          setGuatequeCoords(guatequeData);
-        }
-      } catch (error) {
-        console.warn('Error cargando coordenadas (usando datos locales):', error);
-        // Ya están los datos locales por defecto
-      } finally {
-        // La vista usa las coordenadas locales mientras la API responde.
-      }
-    };
-
-    loadCoordinates();
+    discotecas.forEach((discoteca) => {
+      fetchDiscotecaCoordinates(discoteca.slug)
+        .then((coords) => {
+          if (mounted) {
+            setCoordsBySlug((prev) => ({ ...prev, [discoteca.slug]: coords }));
+          }
+        })
+        .catch((error) => {
+          console.warn(`Sin coordenadas de Fourvenues para ${discoteca.slug} (usando datos locales):`, error);
+          // Ya están los datos locales por defecto.
+        });
+    });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [discotecas]);
 
   const handleBack = () => {
     setSelectedDiscoteca(null);
@@ -231,6 +254,12 @@ export default function App() {
     );
   }
 
+  const primera = discotecas[0];
+  const centroMapa = (primera && coordsBySlug[primera.slug]) ?? {
+    latitude: primera?.latitud ?? 36.5982,
+    longitude: primera?.longitud ?? -6.2242,
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -239,14 +268,14 @@ export default function App() {
         <MapViewComponent
           style={styles.map}
           initialRegion={{
-            latitude: bananaCoords.latitude,
-            longitude: bananaCoords.longitude,
+            latitude: centroMapa.latitude,
+            longitude: centroMapa.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
           region={{
-            latitude: bananaCoords.latitude,
-            longitude: bananaCoords.longitude,
+            latitude: centroMapa.latitude,
+            longitude: centroMapa.longitude,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
@@ -255,39 +284,28 @@ export default function App() {
           points={visiblePoints}
           onPointPress={handlePointPress}
         >
-          {filtros.discotecas && (
-            <MarkerComponent
-              coordinate={{
-                latitude: bananaCoords.latitude,
-                longitude: bananaCoords.longitude,
-              }}
-              discoteca={banana}
-              title={banana.nombre}
-              selected={selectedMarkerSlug === banana.slug}
-              hasAlerts={bananaAlerts.length > 0}
-              eventImage={bananaEventImage ?? undefined}
-              onPress={() => handleMarkerPress(banana)}
-            >
-              <DiscotecaMarker nombre={banana.nombre} color={banana.color} selected={selectedMarkerSlug === banana.slug} />
-            </MarkerComponent>
-          )}
-
-          {filtros.discotecas && guatequeCoords && (
-            <MarkerComponent
-              coordinate={{
-                latitude: guatequeCoords.latitude,
-                longitude: guatequeCoords.longitude,
-              }}
-              discoteca={guateque}
-              title={guateque.nombre}
-              selected={selectedMarkerSlug === guateque.slug}
-              hasAlerts={guatequeAlerts.length > 0}
-              eventImage={guatequeEventImage ?? undefined}
-              onPress={() => handleMarkerPress(guateque)}
-            >
-              <DiscotecaMarker nombre={guateque.nombre} color={guateque.color} selected={selectedMarkerSlug === guateque.slug} />
-            </MarkerComponent>
-          )}
+          {filtros.discotecas &&
+            discotecas.map((discoteca) => {
+              const coords = coordsBySlug[discoteca.slug] ?? {
+                latitude: discoteca.latitud,
+                longitude: discoteca.longitud,
+              };
+              const selected = selectedMarkerSlug === discoteca.slug;
+              return (
+                <MarkerComponent
+                  key={discoteca.slug}
+                  coordinate={{ latitude: coords.latitude, longitude: coords.longitude }}
+                  discoteca={discoteca}
+                  title={discoteca.nombre}
+                  selected={selected}
+                  hasAlerts={(alertsBySlug[discoteca.slug]?.length ?? 0) > 0}
+                  eventImage={eventImageBySlug[discoteca.slug] ?? undefined}
+                  onPress={() => handleMarkerPress(discoteca)}
+                >
+                  <DiscotecaMarker nombre={discoteca.nombre} color={discoteca.color} selected={selected} />
+                </MarkerComponent>
+              );
+            })}
         </MapViewComponent>
       </View>
 
@@ -334,9 +352,11 @@ export default function App() {
           <View style={styles.cardContent}>
             <View style={styles.cardHeader}>
               <Text style={styles.cardNombre}>{selectedClub.nombre}</Text>
-              <View style={styles.ratingBadge}>
-                <Text style={styles.ratingText}>⭐ {selectedClub.rating.toFixed(1)}</Text>
-              </View>
+              {selectedClub.rating != null && (
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingText}>⭐ {selectedClub.rating.toFixed(1)}</Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.direccion}>📍 {selectedClub.direccion}</Text>
@@ -345,12 +365,16 @@ export default function App() {
               <View style={[styles.tag, { backgroundColor: selectedClub.color + '22', borderColor: selectedClub.color + '55' }]}>
                 <Text style={[styles.tagText, { color: selectedClub.color }]}>{selectedClub.genero}</Text>
               </View>
-              <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
-                <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {selectedClub.precioEntrada}€</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagTextMuted}>🕐 {selectedClub.horario}</Text>
-              </View>
+              {selectedClub.precioEntrada != null && (
+                <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
+                  <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {selectedClub.precioEntrada}€</Text>
+                </View>
+              )}
+              {selectedClub.horario && (
+                <View style={styles.tag}>
+                  <Text style={styles.tagTextMuted}>🕐 {selectedClub.horario}</Text>
+                </View>
+              )}
             </View>
 
             <Text style={styles.descripcion} numberOfLines={2}>{selectedClub.descripcion}</Text>

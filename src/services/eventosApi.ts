@@ -1,4 +1,5 @@
 import { Evento, Location } from '../types/evento';
+import { DiscotecaSinColor } from '../types/discoteca';
 import { getApiBaseUrls } from '../config/api';
 
 function normalizeEventos(payload: unknown): Evento[] {
@@ -105,6 +106,34 @@ function normalizeEventosConImagen(payload: unknown): Evento[] {
         image: typeof item.image === 'string' ? item.image : undefined,
       };
     });
+}
+
+/**
+ * Obtiene el listado de discotecas de El Puerto de Santa María que conoce el
+ * backend (`salimos-backend/src/discotecas/discotecas.js`), en vez de tener
+ * la lista hardcodeada en el bundle de la app.
+ */
+export async function fetchDiscotecas(): Promise<DiscotecaSinColor[]> {
+  const urls = getApiBaseUrls().map((baseUrl) => `${baseUrl}/api/discotecas`);
+  let lastError: unknown = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      if (Array.isArray(payload?.data) && payload.data.length > 0) {
+        return payload.data as DiscotecaSinColor[];
+      }
+    } catch (error) {
+      lastError = error;
+      console.warn(`Fallo cargando discotecas desde ${url}:`, error);
+    }
+  }
+
+  throw lastError ?? new Error('No se pudo cargar el listado de discotecas.');
 }
 
 export interface DiscotecaCoordinates {
