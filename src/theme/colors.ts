@@ -34,4 +34,9 @@ export const gradients = {
   primary: [colors.neonPink, colors.neonPurple] as const,
   dark: [colors.background, colors.backgroundLight] as const,
   card: [colors.backgroundCard, colors.backgroundLight] as const,
+  brand: [colors.neonPink, colors.neonPurple] as const,
+  brandSoft: [`${colors.neonPink}CC`, `${colors.neonPurple}CC`] as const,
 } as const;
+
+// Paradas del degradado usado para pintar la ruta ("cómo llegar") en el mapa.
+export const BRAND_GRADIENT = [colors.gradientStart, colors.gradientEnd] as const;
