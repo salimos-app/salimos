@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import { paradasTaxi } from '../data/taxis';
 import { sitios } from '../data/sitios';
 import { SITIO_ESTILO } from '../utils/sitioEstilo';
 import { formatDistance, formatDuration } from '../utils/format';
+import { distanceMeters, ordenarPorCercania, LatLngLike } from '../utils/geo';
 import { MapViewComponent, SimpleMapPoint } from './../components/MapView';
 
 interface Props {
@@ -63,38 +64,92 @@ function sitioToParada(sitio: Sitio): ParadaItinerario {
   };
 }
 
-/** Fila de chips para elegir una parada de taxi (o "sin taxi"). Se reutiliza para la ida y la vuelta. */
-function TaxiChips({
+/**
+ * Fila de una opción de parada (taxi o sitio), en forma de lista y no de
+ * chip: muestra su distancia al punto de referencia (tu ubicación o la
+ * parada anterior) y destaca la más cercana como la opción óptima.
+ */
+function OpcionRow({
+  icon,
+  nombre,
+  sublabel,
+  activo,
+  distancia,
+  esOptima,
+  onPress,
+}: {
+  icon: string;
+  nombre: string;
+  sublabel?: string;
+  activo: boolean;
+  distancia?: number;
+  esOptima?: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity
+      style={[styles.listaRow, activo && styles.listaRowActiva, !activo && esOptima && styles.listaRowOptima]}
+      onPress={onPress}
+      activeOpacity={0.8}
+    >
+      <View style={[styles.listaRowIcon, activo && styles.listaRowIconActivo]}>
+        <Text style={styles.listaRowIconText}>{icon}</Text>
+      </View>
+      <View style={styles.listaRowInfo}>
+        <Text style={styles.listaRowNombre} numberOfLines={1}>
+          {nombre}
+        </Text>
+        {sublabel ? (
+          <Text style={styles.listaRowSub} numberOfLines={1}>
+            {sublabel}
+          </Text>
+        ) : null}
+      </View>
+      {distancia != null && (
+        <View style={[styles.distBadge, esOptima && styles.distBadgeOptima]}>
+          <Text style={[styles.distBadgeText, esOptima && styles.distBadgeTextOptima]} numberOfLines={1}>
+            {esOptima ? '⭐ ' : ''}
+            {formatDistance(distancia)}
+          </Text>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+}
+
+/**
+ * Lista de paradas de taxi (o "sin taxi") ordenada por cercanía a
+ * `referencia` — la primera es la más óptima. Se reutiliza para la ida
+ * (referencia = tu ubicación) y la vuelta (referencia = la discoteca).
+ */
+function TaxiLista({
   selected,
   onSelect,
+  referencia,
 }: {
   selected: ParadaTaxi | null;
   onSelect: (parada: ParadaTaxi | null) => void;
+  referencia: LatLngLike | null;
 }) {
+  const ordenadas = useMemo(
+    () => ordenarPorCercania(paradasTaxi, referencia, (t) => ({ latitude: t.latitud, longitude: t.longitud })),
+    [referencia],
+  );
+
   return (
-    <View style={styles.chipsWrap}>
-      <TouchableOpacity
-        style={[styles.chip, !selected && styles.chipActivo]}
-        onPress={() => onSelect(null)}
-        activeOpacity={0.8}
-      >
-        <Text style={[styles.chipText, !selected && styles.chipTextActivo]}>🚫 Sin taxi</Text>
-      </TouchableOpacity>
-      {paradasTaxi.map((parada) => {
-        const activo = selected?.id === parada.id;
-        return (
-          <TouchableOpacity
-            key={parada.id}
-            style={[styles.chip, activo && styles.chipActivo]}
-            onPress={() => onSelect(parada)}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.chipText, activo && styles.chipTextActivo]} numberOfLines={1}>
-              🚕 {parada.nombre}
-            </Text>
-          </TouchableOpacity>
-        );
-      })}
+    <View style={styles.lista}>
+      <OpcionRow icon="🚫" nombre="Sin taxi" activo={!selected} onPress={() => onSelect(null)} />
+      {ordenadas.map((parada, index) => (
+        <OpcionRow
+          key={parada.id}
+          icon="🚕"
+          nombre={parada.nombre}
+          activo={selected?.id === parada.id}
+          distancia={referencia ? distanceMeters(referencia, { latitude: parada.latitud, longitude: parada.longitud }) : undefined}
+          esOptima={index === 0 && !!referencia}
+          onPress={() => onSelect(parada)}
+        />
+      ))}
     </View>
   );
 }
@@ -117,11 +172,40 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
 
   const { tramos, loading, error, calcular, clear } = useItinerario();
 
+  // Ubicación del usuario, pedida en cuanto se abre el planificador (no se
+  // espera al botón "Calcular") para poder ordenar de inmediato las
+  // paradas de taxi por cercanía. Si el permiso falla, simplemente no se
+  // ordena (no se muestra error: ya se pedirá de nuevo, con su propio
+  // mensaje, al pulsar "Calcular ruta completa").
+  const [origen, setOrigen] = useState<LatLng | null>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    getCurrentLocation()
+      .then((ubicacion) => {
+        if (mounted) setOrigen(ubicacion);
+      })
+      .catch(() => {
+        // Sin permiso todavía: las listas caen a su orden por defecto.
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // La parada intermedia se ordena por cercanía al punto donde el usuario
+  // "está" en ese momento del itinerario: la parada de taxi de ida si
+  // eligió una, o su ubicación actual si no.
+  const referenciaParada: LatLngLike | null = taxiIda
+    ? { latitude: taxiIda.latitud, longitude: taxiIda.longitud }
+    : origen;
+
   const sitiosDeCategoria = useMemo(() => {
     if (!categoriaParada) return [];
     const categorias = CATEGORIA_INFO[categoriaParada].categoriasSitio;
-    return sitios.filter((sitio) => categorias.includes(sitio.categoria));
-  }, [categoriaParada]);
+    const filtrados = sitios.filter((sitio) => categorias.includes(sitio.categoria));
+    return ordenarPorCercania(filtrados, referenciaParada, (s) => ({ latitude: s.latitud, longitude: s.longitud }));
+  }, [categoriaParada, referenciaParada]);
 
   const seleccionarCategoria = (categoria: CategoriaParada | null) => {
     setCategoriaParada(categoria);
@@ -294,7 +378,7 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.stepLabel}>1. Taxi de ida (opcional)</Text>
-        <TaxiChips selected={taxiIda} onSelect={setTaxiIda} />
+        <TaxiLista selected={taxiIda} onSelect={setTaxiIda} referencia={origen} />
 
         <Text style={styles.stepLabel}>2. Bar, súper o bazar (opcional)</Text>
         <View style={styles.chipsWrap}>
@@ -324,29 +408,25 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
         </View>
 
         {categoriaParada && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.sitiosScroll}
-            contentContainerStyle={styles.chipsWrap}
-          >
-            {sitiosDeCategoria.map((sitio) => {
-              const activo = paradaIntermedia?.id === sitio.id;
-              const info = SITIO_ESTILO[sitio.categoria];
-              return (
-                <TouchableOpacity
-                  key={sitio.id}
-                  style={[styles.chip, activo && { backgroundColor: info.color + '2A', borderColor: info.color }]}
-                  onPress={() => setParadaIntermedia(sitio)}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.chipText, activo && { color: info.color }]} numberOfLines={1}>
-                    {info.icon} {sitio.nombre}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </ScrollView>
+          <View style={styles.lista}>
+            <OpcionRow icon="🚫" nombre="Sin parada" activo={!paradaIntermedia} onPress={() => setParadaIntermedia(null)} />
+            {sitiosDeCategoria.map((sitio, index) => (
+              <OpcionRow
+                key={sitio.id}
+                icon={SITIO_ESTILO[sitio.categoria].icon}
+                nombre={sitio.nombre}
+                sublabel={sitio.direccion}
+                activo={paradaIntermedia?.id === sitio.id}
+                distancia={
+                  referenciaParada
+                    ? distanceMeters(referenciaParada, { latitude: sitio.latitud, longitude: sitio.longitud })
+                    : undefined
+                }
+                esOptima={index === 0 && !!referenciaParada}
+                onPress={() => setParadaIntermedia(sitio)}
+              />
+            ))}
+          </View>
         )}
 
         <Text style={styles.stepLabel}>3. Discoteca</Text>
@@ -355,7 +435,7 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
         </View>
 
         <Text style={styles.stepLabel}>4. Taxi de vuelta (opcional)</Text>
-        <TaxiChips selected={taxiVuelta} onSelect={setTaxiVuelta} />
+        <TaxiLista selected={taxiVuelta} onSelect={setTaxiVuelta} referencia={discotecaCoords} />
 
         <Text style={styles.stepLabel}>5. Casa</Text>
         <View style={styles.fixedCard}>
@@ -519,8 +599,74 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
   },
-  sitiosScroll: {
-    marginTop: 10,
+  lista: {
+    gap: 8,
+  },
+  listaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.backgroundLight,
+    borderRadius: 14,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  listaRowActiva: {
+    backgroundColor: colors.neonBlue + '1A',
+    borderColor: colors.neonBlue,
+  },
+  listaRowOptima: {
+    borderColor: colors.neonYellow + '99',
+  },
+  listaRowIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.backgroundCard,
+    marginRight: 10,
+  },
+  listaRowIconActivo: {
+    backgroundColor: colors.neonBlue + '2A',
+  },
+  listaRowIconText: {
+    fontSize: 16,
+  },
+  listaRowInfo: {
+    flex: 1,
+    marginRight: 8,
+  },
+  listaRowNombre: {
+    color: colors.textPrimary,
+    fontSize: 13.5,
+    fontWeight: '700',
+  },
+  listaRowSub: {
+    color: colors.textMuted,
+    fontSize: 11.5,
+    marginTop: 1,
+  },
+  distBadge: {
+    backgroundColor: colors.backgroundCard,
+    borderRadius: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  distBadgeOptima: {
+    backgroundColor: colors.neonYellow + '22',
+    borderColor: colors.neonYellow,
+  },
+  distBadgeText: {
+    color: colors.textSecondary,
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  distBadgeTextOptima: {
+    color: colors.neonYellow,
   },
   chip: {
     backgroundColor: colors.backgroundLight,

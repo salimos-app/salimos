@@ -13,6 +13,7 @@ import AlertsPanel from './src/components/AlertsPanel';
 import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
 import FiltrosBar, { FiltroOpcion } from './src/components/FiltrosBar';
+import DiscotecasListView from './src/components/DiscotecasListView';
 import { useRoute } from './src/hooks/useRoute';
 import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
 import {
@@ -24,6 +25,8 @@ import {
 import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
 import { sitios } from './src/data/sitios';
 import { SITIO_ESTILO } from './src/utils/sitioEstilo';
+import { getCurrentLocation } from './src/services/location';
+import { LatLng } from './src/services/directionsApi';
 
 // Acento de color por discoteca: es un detalle puramente visual (no lo
 // manda el backend), se asigna por índice ciclando esta paleta.
@@ -114,6 +117,8 @@ export default function App() {
   const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
   const [plannerDiscoteca, setPlannerDiscoteca] = useState<Discoteca | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
+  const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
+  const [userLocation, setUserLocation] = useState<LatLng | null>(null);
   const [filtros, setFiltros] = useState<Record<FiltroCategoria, boolean>>({
     discotecas: true,
     bares: true,
@@ -180,6 +185,26 @@ export default function App() {
     () => mapPoints.filter((point) => filtros[filtroDe(point)]),
     [filtros]
   );
+
+  // El modo lista ordena por cercanía, así que en cuanto se entra ahí se
+  // pide la ubicación una vez (en el momento, como el resto de la app); si
+  // no hay permiso, la lista simplemente cae a orden alfabético.
+  useEffect(() => {
+    if (viewMode !== 'list' || userLocation) return;
+    let mounted = true;
+
+    getCurrentLocation()
+      .then((location) => {
+        if (mounted) setUserLocation(location);
+      })
+      .catch(() => {
+        // Sin permiso: la lista se queda en orden alfabético.
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [viewMode, userLocation]);
 
   useEffect(() => {
     let mounted = true;
@@ -280,48 +305,79 @@ export default function App() {
       <StatusBar style="light" />
 
       <View style={styles.mapContainer}>
-        <MapViewComponent
-          style={styles.map}
-          initialRegion={{
-            latitude: centroMapa.latitude,
-            longitude: centroMapa.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          region={{
-            latitude: centroMapa.latitude,
-            longitude: centroMapa.longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          onPress={handleMapPress}
-          routeCoordinates={route?.coordinates}
-          points={visiblePoints}
-          onPointPress={handlePointPress}
+        {viewMode === 'map' ? (
+          <MapViewComponent
+            style={styles.map}
+            initialRegion={{
+              latitude: centroMapa.latitude,
+              longitude: centroMapa.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            region={{
+              latitude: centroMapa.latitude,
+              longitude: centroMapa.longitude,
+              latitudeDelta: 0.05,
+              longitudeDelta: 0.05,
+            }}
+            onPress={handleMapPress}
+            routeCoordinates={route?.coordinates}
+            points={visiblePoints}
+            onPointPress={handlePointPress}
+          >
+            {filtros.discotecas &&
+              discotecas.map((discoteca) => {
+                const coords = coordsBySlug[discoteca.slug] ?? {
+                  latitude: discoteca.latitud,
+                  longitude: discoteca.longitud,
+                };
+                const selected = selectedMarkerSlug === discoteca.slug;
+                return (
+                  <MarkerComponent
+                    key={discoteca.slug}
+                    coordinate={{ latitude: coords.latitude, longitude: coords.longitude }}
+                    discoteca={discoteca}
+                    title={discoteca.nombre}
+                    selected={selected}
+                    hasAlerts={(alertsBySlug[discoteca.slug]?.length ?? 0) > 0}
+                    eventImage={eventImageBySlug[discoteca.slug] ?? undefined}
+                    onPress={() => handleMarkerPress(discoteca)}
+                  >
+                    <DiscotecaMarker nombre={discoteca.nombre} color={discoteca.color} selected={selected} />
+                  </MarkerComponent>
+                );
+              })}
+          </MapViewComponent>
+        ) : (
+          <DiscotecasListView
+            discotecas={discotecas}
+            mostrarDiscotecas={filtros.discotecas}
+            coordsBySlug={coordsBySlug}
+            eventImageBySlug={eventImageBySlug}
+            alertsBySlug={alertsBySlug}
+            points={visiblePoints}
+            userLocation={userLocation}
+            onSelectDiscoteca={handleMarkerPress}
+            onSelectPoint={handlePointPress}
+          />
+        )}
+      </View>
+
+      <View style={styles.viewToggle}>
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, viewMode === 'map' && styles.viewToggleBtnActivo]}
+          onPress={() => setViewMode('map')}
+          activeOpacity={0.85}
         >
-          {filtros.discotecas &&
-            discotecas.map((discoteca) => {
-              const coords = coordsBySlug[discoteca.slug] ?? {
-                latitude: discoteca.latitud,
-                longitude: discoteca.longitud,
-              };
-              const selected = selectedMarkerSlug === discoteca.slug;
-              return (
-                <MarkerComponent
-                  key={discoteca.slug}
-                  coordinate={{ latitude: coords.latitude, longitude: coords.longitude }}
-                  discoteca={discoteca}
-                  title={discoteca.nombre}
-                  selected={selected}
-                  hasAlerts={(alertsBySlug[discoteca.slug]?.length ?? 0) > 0}
-                  eventImage={eventImageBySlug[discoteca.slug] ?? undefined}
-                  onPress={() => handleMarkerPress(discoteca)}
-                >
-                  <DiscotecaMarker nombre={discoteca.nombre} color={discoteca.color} selected={selected} />
-                </MarkerComponent>
-              );
-            })}
-        </MapViewComponent>
+          <Text style={styles.viewToggleIcon}>🗺️</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActivo]}
+          onPress={() => setViewMode('list')}
+          activeOpacity={0.85}
+        >
+          <Text style={styles.viewToggleIcon}>📋</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.header}>
@@ -483,6 +539,35 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
     marginTop: 2,
+  },
+  viewToggle: {
+    position: 'absolute',
+    top: 56,
+    right: 16,
+    flexDirection: 'row',
+    gap: 6,
+  },
+  viewToggleBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.background + 'F0',
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  viewToggleBtnActivo: {
+    backgroundColor: colors.neonPink + '26',
+    borderColor: colors.neonPink,
+  },
+  viewToggleIcon: {
+    fontSize: 16,
   },
   card: {
     position: 'absolute',
