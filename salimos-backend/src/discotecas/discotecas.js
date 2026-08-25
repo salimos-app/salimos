@@ -9,14 +9,23 @@
 //   sube el propio local).
 // - Los Milagros y Phi Phi Beach: OpenStreetMap (amenity=nightclub cerca de
 //   El Puerto de Santa María) © OpenStreetMap contributors, licencia ODbL.
-// - GOLD y Sala New Palace: Google Maps (búsqueda "discoteca"/"sala de
-//   fiestas" en El Puerto de Santa María). GOLD tiene un microsite en
-//   Fourvenues con el slug "gold", pero no se pudo confirmar que sea este
-//   local y no otro "Gold" en otra ciudad (sin eventos publicados para
-//   comparar dirección), así que de momento NO se conecta a Fourvenues.
+// - GOLD, Sala New Palace, Therapy, Boho Garden Club, Musseum Club, dingui,
+//   Pub MIA, Soho Puerto y Bar La Cristalera: Google Maps (búsqueda
+//   "discotecas puerto santa maria" y "discoteca" centradas en El Puerto de
+//   Santa María). Soho Puerto y Bar La Cristalera aparecen como "Pub"/"Bar
+//   musical" en su ficha de Google, pero se listan aquí como discoteca a
+//   petición explícita. GOLD tiene un
+//   microsite en Fourvenues con el slug "gold", pero no se pudo confirmar
+//   que sea este local y no otro "Gold" en otra ciudad (sin eventos
+//   publicados para comparar dirección), así que de momento NO se conecta
+//   a Fourvenues. La misma búsqueda en Google Maps también sacó "Padreo
+//   Club" (a 11 m de las coordenadas de Guateque: mismo local, nombre
+//   antiguo/duplicado) y "Lupita The Club" (a 1,3 m de "dingui": mismo
+//   local que reabrió con otro nombre) — no se añaden porque son el mismo
+//   sitio que una entrada ya existente.
 // Sin precio/horario en las que no son Fourvenues porque no son datos
-// confirmados — no se inventan. El rating de GOLD/Sala New Palace sí es
-// real (de Google Maps).
+// confirmados — no se inventan. El rating de las que vienen de Google Maps
+// sí es real (de Google Maps).
 const DISCOTECAS = [
   {
     id: '1',
@@ -57,7 +66,7 @@ const DISCOTECAS = [
     latitud: 36.5975251,
     longitud: -6.2251072,
     genero: 'Discoteca',
-    imagen: 'https://images.unsplash.com/photo-1582719587489-6f12dbb6d85b?w=400',
+    imagen: 'https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=400',
   },
   {
     id: '4',
@@ -68,7 +77,7 @@ const DISCOTECAS = [
     latitud: 36.5826858,
     longitud: -6.2505636,
     genero: 'Discoteca',
-    imagen: 'https://images.unsplash.com/photo-1517665884544-9366983cd8c3?w=400',
+    imagen: 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=400',
   },
   {
     id: '5',
@@ -80,7 +89,7 @@ const DISCOTECAS = [
     longitud: -6.2260532,
     genero: 'Discoteca',
     rating: 3.3,
-    imagen: 'https://images.unsplash.com/photo-1571266028243-d220c9a3c8e0?w=400',
+    imagen: 'https://images.unsplash.com/photo-1533174072545-7a4b6ad7a6c3?w=400',
   },
   {
     id: '6',
@@ -93,6 +102,90 @@ const DISCOTECAS = [
     genero: 'Discoteca',
     rating: 4.1,
     imagen: 'https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400',
+  },
+  {
+    id: '7',
+    nombre: 'Therapy',
+    slug: 'therapy-santa-maria',
+    direccion: 'Calle Curva, 4, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5992832,
+    longitud: -6.2243972,
+    genero: 'Discoteca',
+    rating: 4.5,
+    imagen: 'https://images.unsplash.com/photo-1547153760-18fc86324498?w=400',
+  },
+  {
+    id: '8',
+    nombre: 'Boho Garden Club',
+    slug: 'boho-garden-club',
+    direccion: 'Avenida de Fuentebravía, 47, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.6030078,
+    longitud: -6.2610168,
+    genero: 'Discoteca',
+    rating: 4.3,
+    imagen: 'https://images.unsplash.com/photo-1518791841217-8f162f1e1131?w=400',
+  },
+  {
+    id: '9',
+    nombre: 'Musseum Club',
+    slug: 'musseum-club',
+    direccion: 'Plaza Juan de la Cosa, 2, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5969234,
+    longitud: -6.2271007,
+    genero: 'Discoteca',
+    rating: 4.3,
+    imagen: 'https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=400',
+  },
+  {
+    id: '10',
+    nombre: 'dingui',
+    slug: 'dingui-santa-maria',
+    direccion: 'Avenida Juan Melgarejo, 10, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5998831,
+    longitud: -6.2514845,
+    genero: 'Discoteca',
+    rating: 3.4,
+    imagen: 'https://images.unsplash.com/photo-1571204829887-3b8d69e4094d?w=400',
+  },
+  {
+    id: '11',
+    nombre: 'Pub MIA',
+    slug: 'pub-mia-el-puerto',
+    direccion: 'Calle Jesús de los Milagros, 29, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5975457,
+    longitud: -6.2250849,
+    genero: 'Discoteca',
+    rating: 3.9,
+    imagen: 'https://images.unsplash.com/photo-1598387993441-a364f854c3e1?w=400',
+  },
+  {
+    id: '12',
+    nombre: 'Soho Puerto',
+    slug: 'soho-puerto',
+    direccion: 'Calle Jesús de los Milagros, 2, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.5986846,
+    longitud: -6.2242611,
+    genero: 'Discoteca',
+    rating: 4.3,
+    imagen: 'https://images.unsplash.com/photo-1524368535928-5b5e00ddc76b?w=400',
+  },
+  {
+    id: '13',
+    nombre: 'Bar La Cristalera',
+    slug: 'bar-la-cristalera',
+    direccion: 'Plaza de las Galeras Reales, s/n, El Puerto de Santa María (Cádiz)',
+    descripcion: 'Discoteca en El Puerto de Santa María.',
+    latitud: 36.597649,
+    longitud: -6.2236862,
+    genero: 'Discoteca',
+    rating: 3.9,
+    imagen: 'https://images.unsplash.com/photo-1520333789090-1afc82db536a?w=400',
   },
 ];
 

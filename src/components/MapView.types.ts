@@ -36,7 +36,8 @@ export interface MapViewProps {
   style?: StyleProp<ViewStyle>;
   initialRegion?: Region;
   region?: Region;
-  onPress?: () => void;
+  /** Toque de fondo (fuera de cualquier marcador). Si el mapa sabe la coordenada tocada, la pasa. */
+  onPress?: (coordinate?: { latitude: number; longitude: number }) => void;
   /** Puntos [latitud, longitud] de una ruta a dibujar sobre el mapa. */
   routeCoordinates?: [number, number][];
   /** Puntos genéricos (no discotecas) a marcar en el mapa. */

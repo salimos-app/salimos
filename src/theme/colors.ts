@@ -18,7 +18,11 @@ export const colors = {
 
   // Bordes y sombras
   border: '#3A3460',
+  borderLight: '#2A2450',
   shadow: '#000000',
+
+  // Acento de marca (para sombras/resplandores; mismo tono que neonPink)
+  brandPink: '#FF2E88',
 
   // Estados
   success: '#39FF14',

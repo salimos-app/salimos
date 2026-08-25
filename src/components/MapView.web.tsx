@@ -227,8 +227,14 @@ function simplePointIcon(icon: string, color?: string) {
   });
 }
 
-function MapClickHandler({ onPress }: { onPress?: () => void }) {
-  useMapEvent('click', () => onPress?.());
+function MapClickHandler({
+  onPress,
+}: {
+  onPress?: (coordinate?: { latitude: number; longitude: number }) => void;
+}) {
+  useMapEvent('click', (event) =>
+    onPress?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
+  );
   return null;
 }
 

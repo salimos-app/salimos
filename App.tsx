@@ -8,6 +8,7 @@ import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
+import RoutePlannerScreen from './src/screens/RoutePlannerScreen';
 import AlertsPanel from './src/components/AlertsPanel';
 import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
@@ -22,7 +23,7 @@ import {
 } from './src/services/eventosApi';
 import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
 import { sitios } from './src/data/sitios';
-import { SitioCategoria } from './src/types/sitio';
+import { SITIO_ESTILO } from './src/utils/sitioEstilo';
 
 // Acento de color por discoteca: es un detalle puramente visual (no lo
 // manda el backend), se asigna por índice ciclando esta paleta.
@@ -61,14 +62,6 @@ const taxiPoints: SimpleMapPoint[] = paradasTaxi.map((parada) => ({
   phone: RADIO_TAXI_TELEFONO,
   color: colors.neonYellow,
 }));
-
-// Bares/pubs en un color, supermercados/tiendas de conveniencia en otro.
-const SITIO_ESTILO: Record<SitioCategoria, { icon: string; color: string; etiqueta: string }> = {
-  bar: { icon: '🍺', color: colors.neonPurple, etiqueta: 'Bar' },
-  pub: { icon: '🍻', color: colors.neonPurple, etiqueta: 'Pub' },
-  supermarket: { icon: '🛒', color: colors.neonGreen, etiqueta: 'Supermercado' },
-  convenience: { icon: '🏪', color: colors.neonGreen, etiqueta: 'Tienda de conveniencia' },
-};
 
 const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
   id: sitio.id,
@@ -119,6 +112,7 @@ export default function App() {
 
   const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(null);
   const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
+  const [plannerDiscoteca, setPlannerDiscoteca] = useState<Discoteca | null>(null);
   const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
   const [filtros, setFiltros] = useState<Record<FiltroCategoria, boolean>>({
     discotecas: true,
@@ -245,11 +239,32 @@ export default function App() {
     setSelectedDiscoteca(discoteca);
   };
 
+  const openPlanificador = (discoteca: Discoteca) => {
+    setPlannerDiscoteca(discoteca);
+  };
+
   if (selectedDiscoteca) {
     return (
       <View style={styles.container}>
         <StatusBar style="light" />
         <EventosScreen discoteca={selectedDiscoteca} onBack={handleBack} />
+      </View>
+    );
+  }
+
+  if (plannerDiscoteca) {
+    const coords = coordsBySlug[plannerDiscoteca.slug] ?? {
+      latitude: plannerDiscoteca.latitud,
+      longitude: plannerDiscoteca.longitud,
+    };
+    return (
+      <View style={styles.container}>
+        <StatusBar style="light" />
+        <RoutePlannerScreen
+          discoteca={plannerDiscoteca}
+          discotecaCoords={coords}
+          onBack={() => setPlannerDiscoteca(null)}
+        />
       </View>
     );
   }
@@ -392,6 +407,10 @@ export default function App() {
               }
               onClear={clearRoute}
             />
+
+            <TouchableOpacity onPress={() => openPlanificador(selectedClub)} activeOpacity={0.85} style={styles.rutaButton}>
+              <Text style={styles.rutaButtonText}>🗺️ Planificar ruta (ida y vuelta)</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity onPress={() => openEventos(selectedClub)} activeOpacity={0.85}>
               <LinearGradient
@@ -563,11 +582,26 @@ const styles = StyleSheet.create({
     backgroundColor: colors.borderLight,
     marginTop: 16,
   },
+  rutaButton: {
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 16,
+    borderWidth: 1.5,
+    borderColor: colors.neonBlue,
+    backgroundColor: colors.neonBlue + '18',
+  },
+  rutaButtonText: {
+    color: colors.neonBlue,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.2,
+  },
   eventosButton: {
     borderRadius: 15,
     paddingVertical: 15,
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: 12,
     shadowColor: colors.brandPink,
     shadowOffset: { width: 0, height: 5 },
     shadowOpacity: 0.4,

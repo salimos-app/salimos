@@ -110,7 +110,7 @@ if(route.length>1){
   L.circleMarker(route[0],{radius:7,color:'#ffffff',weight:3,fillColor:'${colors.brandPink}',fillOpacity:1}).addTo(map);
   map.fitBounds(bounds,{padding:[40,40]});
 }
-map.on('click',()=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map'})));
+map.on('click',(e)=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map',lat:e.latlng.lat,lng:e.latlng.lng})));
 </script></body></html>`;
 }
 
@@ -172,7 +172,11 @@ export function MapViewComponent({
               const point = points?.find((p) => p.id === message.id);
               if (point) onPointPress?.(point);
             } else if (message.type === 'map') {
-              onPress?.();
+              onPress?.(
+                typeof message.lat === 'number' && typeof message.lng === 'number'
+                  ? { latitude: message.lat, longitude: message.lng }
+                  : undefined,
+              );
             }
           } catch {
             // Ignora mensajes inválidos del mapa.

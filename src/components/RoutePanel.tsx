@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { colors } from '../theme/colors';
 import { RouteResult, TravelProfile } from '../services/directionsApi';
+import { formatDistance, formatDuration } from '../utils/format';
 
 interface Props {
   route: RouteResult | null;
@@ -22,19 +23,6 @@ const PROFILES: { id: TravelProfile; icon: string; label: string }[] = [
   { id: 'driving-car', icon: '🚗', label: 'Coche' },
   { id: 'cycling-regular', icon: '🚴', label: 'Bici' },
 ];
-
-function formatDistance(meters: number): string {
-  return meters >= 1000
-    ? `${(meters / 1000).toFixed(1)} km`
-    : `${Math.round(meters)} m`;
-}
-
-function formatDuration(seconds: number): string {
-  const minutes = Math.round(seconds / 60);
-  return minutes >= 60
-    ? `${Math.floor(minutes / 60)} h ${minutes % 60} min`
-    : `${minutes} min`;
-}
 
 export default function RoutePanel({
   route,

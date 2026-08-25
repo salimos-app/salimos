@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import * as Location from 'expo-location';
 import {
   fetchRoute,
   LatLng,
   RouteResult,
   TravelProfile,
 } from '../services/directionsApi';
+import { getCurrentLocation } from '../services/location';
 
 /**
  * Calcula una ruta desde la ubicación actual del usuario hasta un destino,
@@ -25,19 +25,7 @@ export function useRoute() {
     setError(null);
 
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        throw new Error(
-          'Necesitamos permiso de ubicación para calcular la ruta.',
-        );
-      }
-
-      const position = await Location.getCurrentPositionAsync({});
-      const origin: LatLng = {
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-      };
-
+      const origin = await getCurrentLocation();
       const result = await fetchRoute(profile, origin, destination);
       setRoute(result);
     } catch (err) {
