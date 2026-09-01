@@ -12,7 +12,7 @@ import RoutePlannerScreen from './src/screens/RoutePlannerScreen';
 import AlertsPanel from './src/components/AlertsPanel';
 import RoutePanel from './src/components/RoutePanel';
 import PointCard from './src/components/PointCard';
-import FiltrosBar, { FiltroOpcion } from './src/components/FiltrosBar';
+import FiltrosBurbujas, { FiltroOpcion } from './src/components/FiltrosBurbujas';
 import DiscotecasListView from './src/components/DiscotecasListView';
 import { useRoute } from './src/hooks/useRoute';
 import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
@@ -380,21 +380,7 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.header}>
-        <LinearGradient
-          colors={gradients.brand}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.headerBorder}
-        >
-          <View style={styles.headerPill}>
-            <Text style={styles.headerTitle}>SALIMOS</Text>
-            <Text style={styles.headerSubtitle}>El Puerto de Santa María</Text>
-          </View>
-        </LinearGradient>
-      </View>
-
-      <FiltrosBar opciones={FILTROS} activos={filtros} onToggle={toggleFiltro} />
+      <FiltrosBurbujas opciones={FILTROS} activos={filtros} onToggle={toggleFiltro} />
 
       {selectedPoint && (
         <PointCard
@@ -504,41 +490,6 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
-  },
-  header: {
-    position: 'absolute',
-    top: 56,
-    left: 16,
-    right: 16,
-    alignItems: 'center',
-  },
-  headerBorder: {
-    borderRadius: 19,
-    padding: 1.5,
-    shadowColor: colors.brandPink,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  headerPill: {
-    backgroundColor: colors.background + 'F0',
-    borderRadius: 17.5,
-    paddingHorizontal: 22,
-    paddingVertical: 9,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  headerSubtitle: {
-    color: colors.textSecondary,
-    fontSize: 11.5,
-    fontWeight: '600',
-    marginTop: 2,
   },
   viewToggle: {
     position: 'absolute',
