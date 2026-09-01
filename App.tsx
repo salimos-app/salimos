@@ -18,8 +18,7 @@ import { useRoute } from './src/hooks/useRoute';
 import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
 import {
   fetchDiscotecas,
-  fetchDiscotecaCoordinates,
-  fetchProximosEventos,
+  fetchEventImage,
   DiscotecaCoordinates,
 } from './src/services/eventosApi';
 import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
@@ -27,6 +26,7 @@ import { sitios } from './src/data/sitios';
 import { SITIO_ESTILO } from './src/utils/sitioEstilo';
 import { getCurrentLocation } from './src/services/location';
 import { LatLng } from './src/services/directionsApi';
+import { forEachLimit } from './src/utils/concurrency';
 
 // Acento de color por discoteca: es un detalle puramente visual (no lo
 // manda el backend), se asigna por índice ciclando esta paleta.
@@ -79,7 +79,7 @@ const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
 
 const mapPoints: SimpleMapPoint[] = [...taxiPoints, ...sitioPoints];
 
-/** Coordenadas locales por defecto (fallback inmediato si la API no responde, o si la discoteca no tiene ficha en Fourvenues). */
+/** Mapa slug -> coordenadas a partir del listado de discotecas (las trae ya el backend en `/api/discotecas`). */
 function coordsLocalesPorSlug(discotecas: Discoteca[]): Record<string, DiscotecaCoordinates> {
   return Object.fromEntries(
     discotecas.map((d) => [
@@ -125,9 +125,12 @@ export default function App() {
     supermercados: true,
     taxis: true,
   });
-  // Inicializa con los datos locales para que la app se muestre al instante
-  const [coordsBySlug, setCoordsBySlug] = useState<Record<string, DiscotecaCoordinates>>(() =>
-    coordsLocalesPorSlug(discotecasSemillaConColor)
+  // Las coordenadas ya vienen en el listado del backend (`/api/discotecas`),
+  // así que se derivan de ahí en vez de pedirlas una a una a Fourvenues.
+  // Mientras responde el backend se usan las de la semilla local.
+  const coordsBySlug = useMemo<Record<string, DiscotecaCoordinates>>(
+    () => coordsLocalesPorSlug(discotecas),
+    [discotecas]
   );
   const { route, loading: routeLoading, error: routeError, calculateRoute, clearRoute } = useRoute();
 
@@ -141,11 +144,10 @@ export default function App() {
 
   // Foto del próximo evento de cada discoteca: es lo más importante
   // visualmente del pin (reemplaza la inicial) y también se usa en la
-  // tarjeta del mapa en vez de la foto genérica del local. Se piden para
-  // todas las discotecas siempre (no solo la seleccionada) para que los
-  // pines en el mapa ya se vean con la foto del evento sin tocarlos. Las
-  // discotecas sin ficha en Fourvenues simplemente no consiguen foto y caen
-  // al pin genérico.
+  // tarjeta del mapa en vez de la foto genérica del local. El mapa se pinta
+  // ya con la imagen genérica (modo "thumbnail") y estas fotos van entrando
+  // poco a poco en segundo plano (ver más abajo). Las discotecas sin ficha
+  // en Fourvenues simplemente no consiguen foto y se quedan con la genérica.
   const [eventImageBySlug, setEventImageBySlug] = useState<Record<string, string | null>>({});
 
   const selectedClub = selectedMarkerSlug
@@ -157,23 +159,14 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
 
-    // No todos los eventos tienen foto cargada en Fourvenues (algunas
-    // discotecas solo le suben foto a algunos eventos): se toma la del
-    // primer evento próximo que sí tenga, no necesariamente el más cercano.
-    const primeraConFoto = (eventos: { image?: string }[]) =>
-      eventos.find((evento) => evento.image)?.image ?? null;
-
-    discotecas.forEach((discoteca) => {
-      fetchProximosEventos(discoteca.slug)
-        .then((eventos) => {
-          if (mounted) {
-            setEventImageBySlug((prev) => ({ ...prev, [discoteca.slug]: primeraConFoto(eventos) }));
-          }
-        })
-        .catch(() => {
-          // Sin ficha en Fourvenues (o falló la carga): el pin y la tarjeta
-          // caen a la foto genérica del local.
-        });
+    // Se piden "poco a poco" (máx. 3 a la vez) en vez de una petición por
+    // discoteca de golpe: así el arranque no revienta el rate-limiter del
+    // backend y el mapa ya se ve mientras las fotos van cargando.
+    forEachLimit(discotecas, 3, async (discoteca) => {
+      const imagen = await fetchEventImage(discoteca.slug);
+      if (mounted) {
+        setEventImageBySlug((prev) => ({ ...prev, [discoteca.slug]: imagen }));
+      }
     });
 
     return () => {
@@ -205,27 +198,6 @@ export default function App() {
       mounted = false;
     };
   }, [viewMode, userLocation]);
-
-  useEffect(() => {
-    let mounted = true;
-
-    discotecas.forEach((discoteca) => {
-      fetchDiscotecaCoordinates(discoteca.slug)
-        .then((coords) => {
-          if (mounted) {
-            setCoordsBySlug((prev) => ({ ...prev, [discoteca.slug]: coords }));
-          }
-        })
-        .catch((error) => {
-          console.warn(`Sin coordenadas de Fourvenues para ${discoteca.slug} (usando datos locales):`, error);
-          // Ya están los datos locales por defecto.
-        });
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [discotecas]);
 
   const handleBack = () => {
     setSelectedDiscoteca(null);

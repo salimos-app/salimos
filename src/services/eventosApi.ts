@@ -205,6 +205,29 @@ export async function fetchDiscotecaCoordinates(
 }
 
 /**
+ * Solo la foto del próximo evento con imagen (o `null`). Pega únicamente
+ * contra /events, sin el fallback a /metadata de `fetchProximosEventos`:
+ * al arrancar solo interesa la foto para el pin, y /metadata nunca trae
+ * imágenes, así que ese fallback solo sumaría peticiones inútiles.
+ * @param slug Identificador del microsite (ej: "banana")
+ */
+export async function fetchEventImage(slug: string): Promise<string | null> {
+  for (const url of getEventsUrls(slug)) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const payload = await response.json();
+      const eventos = normalizeEventosConImagen(payload);
+      const conFoto = eventos.find((evento) => evento.image)?.image;
+      if (conFoto) return conFoto;
+    } catch (error) {
+      console.warn(`Sin foto de evento para ${slug} (se usa la imagen genérica):`, error);
+    }
+  }
+  return null;
+}
+
+/**
  * Obtiene los próximos eventos de una discoteca, con foto cuando Fourvenues
  * la tenga cargada (a diferencia de /metadata, que es solo el feed schema.org
  * sin imágenes).
