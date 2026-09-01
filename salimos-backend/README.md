@@ -56,7 +56,9 @@ Servidor -> Cliente
 
 `GET /api/directions/:profile?start=lon,lat&end=lon,lat` es un proxy hacia la
 [Directions API de OpenRouteService](https://openrouteservice.org/dev/#/api-docs/v2/directions/{profile}/get)
-(igual que con Fourvenues, la API key se queda en el backend). Devuelve el
+(igual que con Fourvenues, la API key se queda en el backend). Desde abril de
+2026 el proxy apunta a `api.heigit.org/openrouteservice` (el host
+`api.openrouteservice.org` está deprecado y con la cuota recortada). Devuelve el
 GeoJSON tal cual lo manda ORS: `features[0].geometry.coordinates` trae la
 polyline en formato `[longitud, latitud]` y `features[0].properties.summary`
 trae `distance` (metros) y `duration` (segundos).

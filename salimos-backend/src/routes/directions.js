@@ -7,14 +7,17 @@ const router = Router();
 const PROFILES = new Set(['foot-walking', 'driving-car', 'cycling-regular']);
 const COORD_PATTERN = /^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/;
 
+// Desde abril de 2026 `api.openrouteservice.org` está deprecada (y con la cuota
+// recortada) en favor de `api.heigit.org/openrouteservice`. Misma API key,
+// mismo formato de petición; solo cambia el host y el prefijo de ruta.
 function fetchFromOrs(profile, start, end) {
   return new Promise((resolve, reject) => {
     const path =
-      `/v2/directions/${profile}?api_key=${encodeURIComponent(config.ors.apiKey)}` +
+      `/openrouteservice/v2/directions/${profile}?api_key=${encodeURIComponent(config.ors.apiKey)}` +
       `&start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`;
 
     https
-      .get({ hostname: 'api.openrouteservice.org', path }, (res) => {
+      .get({ hostname: 'api.heigit.org', path }, (res) => {
         const chunks = [];
         res.on('data', (chunk) => chunks.push(chunk));
         res.on('end', () => {
