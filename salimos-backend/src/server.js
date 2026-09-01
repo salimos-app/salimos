@@ -10,6 +10,12 @@ const { attachAlertsSocket } = require('./alerts/socket');
 
 const app = express();
 
+// Render (y cualquier PaaS) sirve detrás de un balanceador: sin esto,
+// `req.ip` es la IP del proxy y el rate-limiter mete a TODOS los usuarios
+// en el mismo cubo (se agota enseguida). Con 1 hop de confianza el límite
+// pasa a ser por usuario real.
+app.set('trust proxy', 1);
+
 app.use(morgan('combined'));
 
 app.use((req, res, next) => {
@@ -26,7 +32,9 @@ app.use(
   '/api',
   rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 300,
+    standardHeaders: true,
+    legacyHeaders: false,
     message: { error: 'Demasiadas solicitudes, por favor intente más tarde' },
   })
 );
