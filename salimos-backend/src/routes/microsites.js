@@ -126,4 +126,32 @@ router.get('/:slug/events', async (req, res) => {
   }
 });
 
+/**
+ * Tipos de entrada de un evento (tramos de precio, disponibilidad). Pega
+ * contra /api/events/:eventId/tickets-types de Fourvenues, que a diferencia
+ * de /api/events (metadata del feed) sí incluye precios. Necesita el `id`
+ * interno del evento (el que devuelve /api/events como `id`), no el `code`
+ * corto que aparece en las URLs públicas de site.fourvenues.com.
+ */
+router.get('/:slug/events/:eventId/tickets-types', async (req, res) => {
+  const cacheKey = `tickets-types:${req.params.eventId}`;
+  const cached = readCache(cacheKey);
+  if (cached) {
+    res.type('application/json; charset=utf-8').send(cached);
+    return;
+  }
+
+  try {
+    const { statusCode, body } = await fetchFromFourvenues(
+      `/api/events/${req.params.eventId}/tickets-types?slug=${req.params.slug}`
+    );
+    if (statusCode === 200) {
+      writeCache(cacheKey, body);
+    }
+    res.status(statusCode).type('application/json; charset=utf-8').send(body);
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
 module.exports = router;
