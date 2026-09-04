@@ -47,6 +47,7 @@ app.get('/', (req, res) => {
       '/api/microsites/:slug/metadata',
       '/api/microsites/:slug/events',
       '/api/microsites/:slug/events/:eventId/tickets-types',
+      '/api/discotecas/:slug/eventos-cache',
       '/api/directions/:profile',
       '/api/health',
       'ws:/ws',

@@ -1,6 +1,5 @@
 const { Router } = require('express');
-const https = require('https');
-const config = require('../config');
+const { fetchFromFourvenues, NINETY_DAYS_SECONDS } = require('../fourvenues');
 
 const router = Router();
 
@@ -25,35 +24,6 @@ function writeCache(key, value) {
   cache.set(key, { at: Date.now(), value });
 }
 
-function fetchFromFourvenues(path) {
-  return new Promise((resolve, reject) => {
-    const options = {
-      hostname: config.fourvenues.host,
-      port: 443,
-      path,
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${config.fourvenues.token}`,
-        'Content-Type': 'application/json',
-      },
-    };
-
-    const req = https.request(options, (res) => {
-      const chunks = [];
-      res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => {
-        resolve({
-          statusCode: res.statusCode || 200,
-          body: Buffer.concat(chunks).toString('utf8'),
-        });
-      });
-    });
-
-    req.on('error', reject);
-    req.end();
-  });
-}
-
 router.get('/:slug/metadata', async (req, res) => {
   const cacheKey = `metadata:${req.params.slug}`;
   const cached = readCache(cacheKey);
@@ -74,8 +44,6 @@ router.get('/:slug/metadata', async (req, res) => {
     res.status(502).json({ error: error.message });
   }
 });
-
-const NINETY_DAYS_SECONDS = 90 * 24 * 60 * 60;
 
 /**
  * Eventos con imagen. A diferencia de /metadata (feed schema.org sin

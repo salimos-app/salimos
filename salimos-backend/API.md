@@ -197,9 +197,48 @@ memoria de 10 min (`CACHE_TTL_MS` en [microsites.js](src/routes/microsites.js)):
 | `GET /api/microsites/:slug/metadata` | `GET /api/microsites/:slug/metadata` | Igual, sin tocar |
 | `GET /api/microsites/:slug/events` | `GET /api/events?slug=X&startDate=hoy&endDate=+90d` (todas las páginas agregadas) | `{"data": [...]}` con imagen |
 | `GET /api/microsites/:slug/events/:eventId/tickets-types` | `GET /api/events/:eventId/tickets-types?slug=X` | Igual, sin tocar |
+| `GET /api/discotecas/:slug/eventos-cache` | *(no pega a Fourvenues, lee de la BD)* | Snapshot semanal de eventos, ver abajo |
 
 `:eventId` es el `id` que trae cada evento en `/api/microsites/:slug/events`
 (campo `Evento.id` en la app), **no** el `code` corto de la URL pública.
+
+## Snapshot semanal (Turso) — `npm run sweep`
+
+`GET /api/microsites/:slug/events` pega a Fourvenues en vivo cada vez (con
+caché de solo 10 min). Para no depender de que Fourvenues responda rápido
+en cada arranque de la app, hay un barrido aparte que trae los eventos de
+todas las discotecas con slug real y los guarda en una base de datos
+[Turso](https://turso.tech) (SQLite alojado, tier gratuito sin tarjeta:
+5 GB, 500M lecturas/mes, 10M escrituras/mes — de sobra para esto).
+
+- **Por qué no un `.sqlite` local:** el filesystem de Render (plan gratuito)
+  es efímero — cualquier archivo escrito en disco desaparece en cada
+  redeploy/reinicio/spin-down, y los servicios gratuitos ni siquiera pueden
+  adjuntar un disco persistente. Turso vive fuera de Render, así que da
+  igual cuántas veces se reinicie el backend.
+- **Qué guarda:** solo lo estable — nombre, fechas, imagen, dirección,
+  `code` (ver tabla `eventos` en [db/schema.js](src/db/schema.js)).
+  **Nunca precios** — los tramos de entrada pasan de disponible a agotado
+  en horas, no en días, así que se quedan fuera del snapshot y se piden en
+  vivo (`/tickets-types`, con su propia caché corta).
+- **Cómo corre:** `npm run sweep` (`src/jobs/sweepEventos.js`) — pensado
+  para lanzarse como **cron aparte** (p. ej. un Render Cron Job semanal),
+  no dentro del proceso del servidor: así un fallo del barrido no tira el
+  proxy en vivo, y no depende de que el servidor esté despierto en ese
+  momento exacto.
+- **Si Fourvenues falla para una discoteca** esa discoteca se salta y se
+  deja su snapshot de la semana anterior tal cual (mejor datos viejos que
+  vaciar la tabla). Si tiene éxito, se borra su snapshot anterior y se
+  inserta el nuevo en una sola transacción (`db.batch(...)`).
+- **Variables de entorno:** `TURSO_DATABASE_URL` y `TURSO_AUTH_TOKEN`
+  (crear base + token en [app.turso.tech](https://app.turso.tech), nunca
+  en el repo — van en `.env` local / variables de entorno de Render, igual
+  que `FOURVENUES_API_TOKEN`).
+- **Se archiva sola si nadie la toca 10 días** (política del free tier de
+  Turso): los datos no se borran, pero hay que "despertarla" vía su API
+  antes de poder consultarla. El propio barrido semanal (escribe cada 7
+  días) evita que esto pase mientras el cron siga corriendo — si el cron
+  se cae y además nadie usa la app en 10 días, sí se archivaría.
 
 ## Notas
 
