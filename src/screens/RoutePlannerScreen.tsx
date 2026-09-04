@@ -16,8 +16,6 @@ import { ParadaItinerario } from '../types/itinerario';
 import { LatLng } from '../services/directionsApi';
 import { getCurrentLocation } from '../services/location';
 import { useItinerario } from '../hooks/useItinerario';
-import { paradasTaxi } from '../data/taxis';
-import { sitios } from '../data/sitios';
 import { SITIO_ESTILO } from '../utils/sitioEstilo';
 import { formatDistance, formatDuration } from '../utils/format';
 import { distanceMeters, ordenarPorCercania, LatLngLike } from '../utils/geo';
@@ -26,6 +24,8 @@ import { MapViewComponent, SimpleMapPoint } from './../components/MapView';
 interface Props {
   discoteca: Discoteca;
   discotecaCoords: LatLng;
+  sitios: Sitio[];
+  paradasTaxi: ParadaTaxi[];
   onBack: () => void;
 }
 
@@ -123,17 +123,19 @@ function OpcionRow({
  * (referencia = tu ubicación) y la vuelta (referencia = la discoteca).
  */
 function TaxiLista({
+  paradasTaxi,
   selected,
   onSelect,
   referencia,
 }: {
+  paradasTaxi: ParadaTaxi[];
   selected: ParadaTaxi | null;
   onSelect: (parada: ParadaTaxi | null) => void;
   referencia: LatLngLike | null;
 }) {
   const ordenadas = useMemo(
     () => ordenarPorCercania(paradasTaxi, referencia, (t) => ({ latitude: t.latitud, longitude: t.longitud })),
-    [referencia],
+    [paradasTaxi, referencia],
   );
 
   return (
@@ -160,7 +162,13 @@ function TaxiLista({
  * → casa. Cada tramo se calcula encadenando `fetchRoute` (a pie o en coche
  * según si sale de una parada de taxi).
  */
-export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack }: Props) {
+export default function RoutePlannerScreen({
+  discoteca,
+  discotecaCoords,
+  sitios,
+  paradasTaxi,
+  onBack,
+}: Props) {
   const [taxiIda, setTaxiIda] = useState<ParadaTaxi | null>(null);
   const [categoriaParada, setCategoriaParada] = useState<CategoriaParada | null>(null);
   const [paradaIntermedia, setParadaIntermedia] = useState<Sitio | null>(null);
@@ -205,7 +213,7 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
     const categorias = CATEGORIA_INFO[categoriaParada].categoriasSitio;
     const filtrados = sitios.filter((sitio) => categorias.includes(sitio.categoria));
     return ordenarPorCercania(filtrados, referenciaParada, (s) => ({ latitude: s.latitud, longitude: s.longitud }));
-  }, [categoriaParada, referenciaParada]);
+  }, [sitios, categoriaParada, referenciaParada]);
 
   const seleccionarCategoria = (categoria: CategoriaParada | null) => {
     setCategoriaParada(categoria);
@@ -378,7 +386,7 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.stepLabel}>1. Taxi de ida (opcional)</Text>
-        <TaxiLista selected={taxiIda} onSelect={setTaxiIda} referencia={origen} />
+        <TaxiLista paradasTaxi={paradasTaxi} selected={taxiIda} onSelect={setTaxiIda} referencia={origen} />
 
         <Text style={styles.stepLabel}>2. Bar, súper o bazar (opcional)</Text>
         <View style={styles.chipsWrap}>
@@ -435,7 +443,7 @@ export default function RoutePlannerScreen({ discoteca, discotecaCoords, onBack 
         </View>
 
         <Text style={styles.stepLabel}>4. Taxi de vuelta (opcional)</Text>
-        <TaxiLista selected={taxiVuelta} onSelect={setTaxiVuelta} referencia={discotecaCoords} />
+        <TaxiLista paradasTaxi={paradasTaxi} selected={taxiVuelta} onSelect={setTaxiVuelta} referencia={discotecaCoords} />
 
         <Text style={styles.stepLabel}>5. Casa</Text>
         <View style={styles.fixedCard}>

@@ -4,3 +4,8 @@ export interface ParadaTaxi {
   latitud: number;
   longitud: number;
 }
+
+export interface RadioTaxiInfo {
+  nombre: string;
+  telefono: string;
+}

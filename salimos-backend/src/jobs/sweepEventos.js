@@ -1,4 +1,3 @@
-const { DISCOTECAS } = require('../discotecas/discotecas');
 const { fetchAllEventos } = require('../fourvenues');
 const { getDb } = require('../db/client');
 const { ensureSchema } = require('../db/schema');
@@ -18,16 +17,17 @@ async function runSweep() {
   const db = getDb();
   await ensureSchema(db);
 
-  const conSlug = DISCOTECAS.filter((d) => d.slug);
+  const slugsResult = await db.execute('SELECT slug FROM discotecas WHERE slug IS NOT NULL');
+  const slugs = slugsResult.rows.map((row) => row.slug);
   const resumen = [];
 
-  for (const discoteca of conSlug) {
+  for (const slug of slugs) {
     try {
-      const eventos = await fetchAllEventos(discoteca.slug);
+      const eventos = await fetchAllEventos(slug);
       const ahora = Date.now();
 
       const statements = [
-        { sql: 'DELETE FROM eventos WHERE discoteca_slug = ?', args: [discoteca.slug] },
+        { sql: 'DELETE FROM eventos WHERE discoteca_slug = ?', args: [slug] },
         ...eventos
           .filter((evento) => typeof evento.id === 'string')
           .map((evento) => ({
@@ -36,7 +36,7 @@ async function runSweep() {
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             args: [
               evento.id,
-              discoteca.slug,
+              slug,
               evento.code ?? null,
               evento.name ?? '',
               evento.description ?? null,
@@ -51,9 +51,9 @@ async function runSweep() {
       ];
 
       await db.batch(statements, 'write');
-      resumen.push({ slug: discoteca.slug, eventos: eventos.length, ok: true });
+      resumen.push({ slug, eventos: eventos.length, ok: true });
     } catch (error) {
-      resumen.push({ slug: discoteca.slug, ok: false, error: error.message });
+      resumen.push({ slug, ok: false, error: error.message });
     }
   }
 

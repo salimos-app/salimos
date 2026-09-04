@@ -1,0 +1,24 @@
+name: Barrido semanal de eventos
+
+on:
+  schedule:
+    # 04:00 UTC todos los lunes. GitHub Actions no garantiza el minuto exacto
+    # en horas de mucha carga, pero para un barrido semanal da igual.
+    - cron: "0 4 * * 1"
+  workflow_dispatch: {}
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Disparar POST /api/internal/sweep
+        run: |
+          status=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${{ secrets.SWEEP_SECRET }}" \
+            "https://backend-salimos.onrender.com/api/internal/sweep")
+          echo "HTTP $status"
+          cat /tmp/response.json
+          if [ "$status" -ne 200 ]; then
+            echo "El barrido falló (status $status)"
+            exit 1
+          fi

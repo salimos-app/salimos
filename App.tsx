@@ -3,7 +3,6 @@ import { StatusBar } from 'expo-status-bar';
 import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients } from './src/theme/colors';
-import { discotecas as discotecasSemilla } from './src/data/discotecas';
 import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
@@ -21,8 +20,9 @@ import {
   fetchEventImage,
   DiscotecaCoordinates,
 } from './src/services/eventosApi';
-import { paradasTaxi, RADIO_TAXI_NOMBRE, RADIO_TAXI_TELEFONO } from './src/data/taxis';
-import { sitios } from './src/data/sitios';
+import { fetchSitios, fetchParadasTaxi } from './src/services/lugaresApi';
+import { Sitio } from './src/types/sitio';
+import { ParadaTaxi } from './src/types/taxi';
 import { SITIO_ESTILO } from './src/utils/sitioEstilo';
 import { getCurrentLocation } from './src/services/location';
 import { LatLng } from './src/services/directionsApi';
@@ -54,30 +54,32 @@ function filtroDe(point: SimpleMapPoint): FiltroCategoria {
   return 'supermercados';
 }
 
-const taxiPoints: SimpleMapPoint[] = paradasTaxi.map((parada) => ({
-  id: parada.id,
-  latitude: parada.latitud,
-  longitude: parada.longitud,
-  label: parada.nombre,
-  sublabel: 'Parada de taxi',
-  icon: '🚕',
-  kind: 'taxi',
-  phone: RADIO_TAXI_TELEFONO,
-  color: colors.neonYellow,
-}));
+function taxiPointsFrom(paradasTaxi: ParadaTaxi[], telefono?: string): SimpleMapPoint[] {
+  return paradasTaxi.map((parada) => ({
+    id: parada.id,
+    latitude: parada.latitud,
+    longitude: parada.longitud,
+    label: parada.nombre,
+    sublabel: 'Parada de taxi',
+    icon: '🚕',
+    kind: 'taxi',
+    phone: telefono,
+    color: colors.neonYellow,
+  }));
+}
 
-const sitioPoints: SimpleMapPoint[] = sitios.map((sitio) => ({
-  id: sitio.id,
-  latitude: sitio.latitud,
-  longitude: sitio.longitud,
-  label: sitio.nombre,
-  sublabel: sitio.direccion ?? SITIO_ESTILO[sitio.categoria].etiqueta,
-  icon: SITIO_ESTILO[sitio.categoria].icon,
-  color: SITIO_ESTILO[sitio.categoria].color,
-  kind: sitio.categoria,
-}));
-
-const mapPoints: SimpleMapPoint[] = [...taxiPoints, ...sitioPoints];
+function sitioPointsFrom(sitios: Sitio[]): SimpleMapPoint[] {
+  return sitios.map((sitio) => ({
+    id: sitio.id,
+    latitude: sitio.latitud,
+    longitude: sitio.longitud,
+    label: sitio.nombre,
+    sublabel: sitio.direccion ?? SITIO_ESTILO[sitio.categoria].etiqueta,
+    icon: SITIO_ESTILO[sitio.categoria].icon,
+    color: SITIO_ESTILO[sitio.categoria].color,
+    kind: sitio.categoria,
+  }));
+}
 
 /** Mapa slug -> coordenadas a partir del listado de discotecas (las trae ya el backend en `/api/discotecas`). */
 function coordsLocalesPorSlug(discotecas: Discoteca[]): Record<string, DiscotecaCoordinates> {
@@ -89,29 +91,58 @@ function coordsLocalesPorSlug(discotecas: Discoteca[]): Record<string, Discoteca
   );
 }
 
-const discotecasSemillaConColor = conColor(discotecasSemilla);
-
 export default function App() {
-  // Arranca con la semilla local para que la app se muestre al instante; en
-  // cuanto responde el backend, `discotecas` pasa a ser el listado real de
-  // /api/discotecas (mismo shape, así que todo lo demás no se entera).
-  const [discotecas, setDiscotecas] = useState<Discoteca[]>(discotecasSemillaConColor);
+  // Todo (discotecas, sitios, paradas de taxi) llega del backend: no hay
+  // ningún dato de negocio hardcodeado en el bundle, así que se arranca
+  // vacío y se muestra un loader hasta que responde la primera carga.
+  const [discotecas, setDiscotecas] = useState<Discoteca[]>([]);
+  const [sitios, setSitios] = useState<Sitio[]>([]);
+  const [paradasTaxi, setParadasTaxi] = useState<ParadaTaxi[]>([]);
+  const [telefonoRadioTaxi, setTelefonoRadioTaxi] = useState<string | undefined>(undefined);
+  const [cargandoInicial, setCargandoInicial] = useState(true);
 
   useEffect(() => {
     let mounted = true;
 
-    fetchDiscotecas()
-      .then((data) => {
+    Promise.allSettled([
+      fetchDiscotecas().then((data) => {
         if (mounted) setDiscotecas(conColor(data));
+      }),
+      fetchSitios().then((data) => {
+        if (mounted) setSitios(data);
+      }),
+      fetchParadasTaxi().then(({ paradas, radioTaxi }) => {
+        if (mounted) {
+          setParadasTaxi(paradas);
+          setTelefonoRadioTaxi(radioTaxi.telefono);
+        }
+      }),
+    ])
+      .then((resultados) => {
+        for (const resultado of resultados) {
+          if (resultado.status === 'rejected') {
+            console.warn('Error cargando datos iniciales del backend:', resultado.reason);
+          }
+        }
       })
-      .catch((error) => {
-        console.warn('Error cargando discotecas del backend (usando semilla local):', error);
+      .finally(() => {
+        if (mounted) setCargandoInicial(false);
       });
 
     return () => {
       mounted = false;
     };
   }, []);
+
+  const taxiPoints = useMemo(
+    () => taxiPointsFrom(paradasTaxi, telefonoRadioTaxi),
+    [paradasTaxi, telefonoRadioTaxi]
+  );
+  const sitioPoints = useMemo(() => sitioPointsFrom(sitios), [sitios]);
+  const mapPoints = useMemo<SimpleMapPoint[]>(
+    () => [...taxiPoints, ...sitioPoints],
+    [taxiPoints, sitioPoints]
+  );
 
   const [selectedMarkerSlug, setSelectedMarkerSlug] = useState<string | null>(null);
   const [selectedDiscoteca, setSelectedDiscoteca] = useState<Discoteca | null>(null);
@@ -176,7 +207,7 @@ export default function App() {
 
   const visiblePoints = useMemo(
     () => mapPoints.filter((point) => filtros[filtroDe(point)]),
-    [filtros]
+    [mapPoints, filtros]
   );
 
   // El modo lista ordena por cercanía, así que en cuanto se entra ahí se
@@ -260,8 +291,20 @@ export default function App() {
         <RoutePlannerScreen
           discoteca={plannerDiscoteca}
           discotecaCoords={coords}
+          sitios={sitios}
+          paradasTaxi={paradasTaxi}
           onBack={() => setPlannerDiscoteca(null)}
         />
+      </View>
+    );
+  }
+
+  if (cargandoInicial) {
+    return (
+      <View style={[styles.container, styles.centerContent]}>
+        <StatusBar style="light" />
+        <ActivityIndicator size="large" color={colors.neonPink} />
+        <Text style={styles.loadingText}>Cargando discotecas, bares y taxis...</Text>
       </View>
     );
   }

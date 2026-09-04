@@ -6,6 +6,9 @@ const config = require('./config');
 const micrositesRouter = require('./routes/microsites');
 const directionsRouter = require('./routes/directions');
 const discotecasRouter = require('./routes/discotecas');
+const sitiosRouter = require('./routes/sitios');
+const taxisRouter = require('./routes/taxis');
+const internalRouter = require('./routes/internal');
 const { attachAlertsSocket } = require('./alerts/socket');
 
 const app = express();
@@ -44,10 +47,13 @@ app.get('/', (req, res) => {
     message: 'Salimos backend está funcionando',
     endpoints: [
       '/api/discotecas',
+      '/api/sitios',
+      '/api/taxis',
       '/api/microsites/:slug/metadata',
       '/api/microsites/:slug/events',
       '/api/microsites/:slug/events/:eventId/tickets-types',
       '/api/discotecas/:slug/eventos-cache',
+      'POST /api/internal/sweep',
       '/api/directions/:profile',
       '/api/health',
       'ws:/ws',
@@ -63,6 +69,9 @@ app.get('/api/health', (req, res) => {
 app.use('/api/microsites', micrositesRouter);
 app.use('/api/directions', directionsRouter);
 app.use('/api/discotecas', discotecasRouter);
+app.use('/api/sitios', sitiosRouter);
+app.use('/api/taxis', taxisRouter);
+app.use('/api/internal', internalRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not found' });

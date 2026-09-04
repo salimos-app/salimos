@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
-    "sweep": "node src/jobs/sweepEventos.js"
+    "sweep": "node src/jobs/sweepEventos.js",
+    "seed:data": "node src/db/seed.js"
   },
   "dependencies": {
     "@libsql/client": "^0.18.0",
