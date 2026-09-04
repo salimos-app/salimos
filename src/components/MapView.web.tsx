@@ -1,29 +1,33 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import {
-  MapContainer,
-  TileLayer,
-  Marker,
-  Popup,
-  Polyline,
-  CircleMarker,
-  useMap,
-  useMapEvent,
-} from 'react-leaflet';
-import L from 'leaflet';
-import 'leaflet/dist/leaflet.css';
-import 'leaflet.markercluster';
-import 'leaflet.markercluster/dist/MarkerCluster.css';
-import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
+import * as maplibregl from 'maplibre-gl';
+
+// MapLibre intenta detectar la URL de su propio <script> para relanzarse a sí
+// mismo como worker; bajo Metro (el bundler de Expo web) todo el código de la
+// app —MapLibre incluido— viaja concatenado en un único bundle enorme, así
+// que esa autodetección acaba intentando ejecutar el bundle completo de la
+// app dentro del worker (sin `document`/`window`), donde se cuelga en
+// silencio sin llegar a levantar el mapa. El build "csp-worker" es un worker
+// clásico autocontenido (sin imports externos) pensado justo para bundlers
+// como este — pero un worker clásico no puede cargarse cross-origin (el
+// navegador lo bloquea con SecurityError pase lo que pase con CORS), así que
+// se sirve una copia estática desde el propio origen
+// (`public/maplibre-gl-csp-worker.js`) — hay que mantenerla sincronizada si
+// se actualiza la versión de `maplibre-gl`.
+maplibregl.setWorkerUrl('/maplibre-gl-csp-worker.js');
+import type {
+  Feature,
+  FeatureCollection,
+  Point as GeoJSONPoint,
+} from 'geojson';
+import 'maplibre-gl/dist/maplibre-gl.css';
 import { Discoteca } from '../types/discoteca';
 import { colors, BRAND_GRADIENT } from '../theme/colors';
-import { buildGradientSegments } from '../utils/gradient';
 import {
   MarkerProps,
   MapViewProps,
   SimpleMapPoint,
-  TILE_URL,
-  TILE_ATTRIBUTION,
+  mapStyle,
 } from './MapView.types';
 
 const DEFAULT_DISCOTECA_IMAGE =
@@ -32,40 +36,6 @@ const DEFAULT_DISCOTECA_IMAGE =
 /** Ancho del pin cuando muestra la foto del evento (grande, a su forma natural, sin redondear). */
 const EVENT_PIN_IMAGE_SIZE = 100;
 const EVENT_PIN_POINTER_HEIGHT = 10;
-
-let themeInjected = false;
-function injectLeafletTheme() {
-  if (themeInjected || typeof document === 'undefined') return;
-  themeInjected = true;
-  const style = document.createElement('style');
-  style.id = 'leaflet-salimos-theme';
-  style.textContent = `
-    .leaflet-control-zoom a {
-      background-color: ${colors.backgroundLight} !important;
-      color: ${colors.textPrimary} !important;
-      border-color: ${colors.border} !important;
-    }
-    .leaflet-control-zoom a:hover {
-      background-color: ${colors.backgroundCard} !important;
-    }
-    .leaflet-control-attribution {
-      background: ${colors.background}CC !important;
-      color: ${colors.textSecondary} !important;
-    }
-    .leaflet-control-attribution a {
-      color: ${colors.neonPink} !important;
-    }
-    .leaflet-popup-content-wrapper {
-      background: ${colors.backgroundCard} !important;
-      color: ${colors.textPrimary} !important;
-      border-radius: 12px !important;
-    }
-    .leaflet-popup-tip {
-      background: ${colors.backgroundCard} !important;
-    }
-  `;
-  document.head.appendChild(style);
-}
 
 /** Badge de alerta activa (estilo Waze), pegado a la esquina superior-izquierda del pin. */
 const ALERT_BADGE_HTML = `
@@ -115,7 +85,7 @@ function pinNameLabel(discoteca: Discoteca, selected: boolean) {
  * forma natural, sin recortar ni redondear); si no, cae al diseño anterior
  * (inicial sobre el color de marca).
  */
-function discotecaIcon(
+function discotecaMarkerHtml(
   discoteca: Discoteca,
   selected: boolean,
   hasAlerts?: boolean,
@@ -124,165 +94,339 @@ function discotecaIcon(
   if (eventImage) {
     const width = EVENT_PIN_IMAGE_SIZE;
     const pointer = EVENT_PIN_POINTER_HEIGHT;
-    // Alto asumido para posicionar el pin (la imagen real puede diferir
-    // levemente según su proporción; no se recorta como hace `object-fit`).
-    const assumedHeight = width + pointer;
-    return L.divIcon({
-      className: 'club-pin',
-      html: `
-        <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.06 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
-          ${pinNameLabel(discoteca, selected)}
-          <div style="position: relative; width: ${width}px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));">
-            <img src="${eventImage}" style="
-              display: block;
-              width: ${width}px;
-              height: auto;
-              border: 3px solid ${selected ? '#ffffff' : discoteca.color};
-              box-sizing: border-box;
-            " />
-            <div style="
-              width: 0;
-              height: 0;
-              margin: 0 auto;
-              border-left: 8px solid transparent;
-              border-right: 8px solid transparent;
-              border-top: ${pointer}px solid ${discoteca.color};
-            "></div>
-            ${hasAlerts ? ALERT_BADGE_HTML : ''}
-          </div>
-        </div>
-      `,
-      iconSize: [140, 26 + assumedHeight],
-      iconAnchor: [70, 24 + assumedHeight],
-      popupAnchor: [0, -(24 + assumedHeight)],
-    });
-  }
-
-  const initial = (discoteca.nombre || '?').charAt(0).toUpperCase();
-  return L.divIcon({
-    className: 'club-pin',
-    html: `
-      <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
+    return `
+      <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.06 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
         ${pinNameLabel(discoteca, selected)}
-        <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
-          <svg width="36" height="42" viewBox="0 0 36 42">
-            <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
-              fill="${discoteca.color}" stroke="${selected ? '#ffffff' : '#0A0A10'}" stroke-width="${selected ? 2.5 : 1.5}"/>
-          </svg>
-          <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:800; font-size:14px; font-family:-apple-system, system-ui, sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
+        <div style="position: relative; width: ${width}px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));">
+          <img src="${eventImage}" style="
+            display: block;
+            width: ${width}px;
+            height: auto;
+            border: 3px solid ${selected ? '#ffffff' : discoteca.color};
+            box-sizing: border-box;
+          " />
+          <div style="
+            width: 0;
+            height: 0;
+            margin: 0 auto;
+            border-left: 8px solid transparent;
+            border-right: 8px solid transparent;
+            border-top: ${pointer}px solid ${discoteca.color};
+          "></div>
           ${hasAlerts ? ALERT_BADGE_HTML : ''}
         </div>
       </div>
-    `,
-    iconSize: [140, 68],
-    iconAnchor: [70, 66],
-    popupAnchor: [0, -66],
-  });
+    `;
+  }
+
+  const initial = (discoteca.nombre || '?').charAt(0).toUpperCase();
+  return `
+    <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
+      ${pinNameLabel(discoteca, selected)}
+      <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
+        <svg width="36" height="42" viewBox="0 0 36 42">
+          <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
+            fill="${discoteca.color}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
+        </svg>
+        <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:800; font-size:14px; font-family:-apple-system, system-ui, sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
+        ${hasAlerts ? ALERT_BADGE_HTML : ''}
+      </div>
+    </div>
+  `;
 }
 
 /** Icono de cluster (grupo de puntos comprimidos al alejar el mapa), con el acento de marca. */
-function clusterIconOptions(count: number) {
+function clusterMarkerHtml(count: number) {
   const size = count < 10 ? 36 : count < 25 ? 44 : 52;
   const fontSize = count < 10 ? 12 : count < 25 ? 13.5 : 15;
-  return {
-    className: '',
-    html: `<div style="
-      width: ${size}px;
-      height: ${size}px;
-      border-radius: 50%;
-      background: ${colors.backgroundCard}F2;
-      border: 2.5px solid ${colors.brandPink};
-      box-shadow: 0 0 0 4px ${colors.brandPink}26, 0 8px 18px rgba(0,0,0,.5);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #ffffff;
-      font-weight: 800;
-      font-size: ${fontSize}px;
-      font-family: -apple-system, system-ui, sans-serif;
-    ">${count}</div>`,
-    iconSize: [size, size] as [number, number],
-    iconAnchor: [size / 2, size / 2] as [number, number],
-  };
+  return `<div style="
+    width: ${size}px;
+    height: ${size}px;
+    border-radius: 50%;
+    background: ${colors.backgroundCard}F2;
+    border: 2.5px solid ${colors.brandPink};
+    box-shadow: 0 0 0 4px ${colors.brandPink}26, 0 8px 18px rgba(0,0,0,.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #ffffff;
+    font-weight: 800;
+    font-size: ${fontSize}px;
+    font-family: -apple-system, system-ui, sans-serif;
+    cursor: pointer;
+  ">${count}</div>`;
 }
 
-function simplePointIcon(icon: string, color?: string) {
-  return L.divIcon({
-    className: '',
-    html: `<div style="
-      width: 30px;
-      height: 30px;
-      border-radius: 50%;
-      background: ${color ?? colors.backgroundCard};
-      border: 2.5px solid ${colors.background};
-      box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 6px 14px rgba(0,0,0,.45);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 14px;
-    ">${icon}</div>`,
-    iconSize: [30, 30],
-    iconAnchor: [15, 15],
-    popupAnchor: [0, -15],
-  });
+function simplePointHtml(icon: string, color?: string) {
+  return `<div style="
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: ${color ?? colors.backgroundCard};
+    border: 2.5px solid ${colors.background};
+    box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 6px 14px rgba(0,0,0,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    cursor: pointer;
+  ">${icon}</div>`;
 }
 
-function MapClickHandler({
-  onPress,
-}: {
-  onPress?: (coordinate?: { latitude: number; longitude: number }) => void;
-}) {
-  useMapEvent('click', (event) =>
-    onPress?.({ latitude: event.latlng.lat, longitude: event.latlng.lng }),
-  );
-  return null;
-}
+const POINTS_SOURCE_ID = 'salimos-points';
+const POINTS_CLUSTER_LAYER_ID = 'salimos-points-clusters';
 
-/**
- * Agrupa los puntos genéricos (taxis, bares, supermercados...) en clusters
- * cuando el mapa está alejado, para que no se amontonen. Se maneja de forma
- * imperativa (fuera de los componentes declarativos de react-leaflet) porque
- * leaflet.markercluster no tiene binding oficial para react-leaflet v5.
- */
-function PointsClusterLayer({
-  points,
-  onPointPress,
-}: {
-  points: SimpleMapPoint[];
-  onPointPress?: (point: SimpleMapPoint) => void;
-}) {
-  const map = useMap();
+/** Registra (o repone) la fuente GeoJSON + capa de clusters nativos de MapLibre para `points`. */
+function usePointsClusterLayer(
+  map: maplibregl.Map | null,
+  points: SimpleMapPoint[],
+  onPointPress?: (point: SimpleMapPoint) => void,
+) {
+  const markersRef = React.useRef<maplibregl.Marker[]>([]);
   const onPointPressRef = React.useRef(onPointPress);
   onPointPressRef.current = onPointPress;
 
   React.useEffect(() => {
-    const group = (
-      L as unknown as {
-        markerClusterGroup: (options: Record<string, unknown>) => L.LayerGroup;
-      }
-    ).markerClusterGroup({
-      maxClusterRadius: 56,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      iconCreateFunction: (cluster: { getChildCount: () => number }) =>
-        L.divIcon(clusterIconOptions(cluster.getChildCount())),
-    });
+    if (!map) return;
+    const m = map;
 
-    points.forEach((point) => {
-      const marker = L.marker([point.latitude, point.longitude], {
-        icon: simplePointIcon(point.icon ?? '📍', point.color),
+    const geojson: FeatureCollection<GeoJSONPoint> = {
+      type: 'FeatureCollection',
+      features: points.map((point): Feature<GeoJSONPoint> => ({
+        type: 'Feature',
+        properties: { id: point.id },
+        geometry: {
+          type: 'Point',
+          coordinates: [point.longitude, point.latitude],
+        },
+      })),
+    };
+
+    function clearIndividualMarkers() {
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
+    }
+
+    function renderIndividualMarkers() {
+      clearIndividualMarkers();
+      if (!m.getSource(POINTS_SOURCE_ID)) return;
+      const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
+        filter: ['!', ['has', 'point_count']],
       });
-      marker.on('click', () => onPointPressRef.current?.(point));
-      group.addLayer(marker);
-    });
+      const seen = new Set<string>();
+      features.forEach((feature: maplibregl.MapGeoJSONFeature) => {
+        const id = feature.properties?.id as string | undefined;
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        const point = points.find((p) => p.id === id);
+        if (!point) return;
+        const el = document.createElement('div');
+        el.innerHTML = simplePointHtml(point.icon ?? '📍', point.color);
+        const marker = new maplibregl.Marker({
+          element: el.firstElementChild as HTMLElement,
+        })
+          .setLngLat([point.longitude, point.latitude])
+          .addTo(m);
+        el.firstElementChild?.addEventListener('click', (event) => {
+          event.stopPropagation();
+          onPointPressRef.current?.(point);
+        });
+        markersRef.current.push(marker);
+      });
+    }
 
-    map.addLayer(group);
+    function setup() {
+      if (m.getLayer(POINTS_CLUSTER_LAYER_ID))
+        m.removeLayer(POINTS_CLUSTER_LAYER_ID);
+      if (m.getSource(POINTS_SOURCE_ID)) m.removeSource(POINTS_SOURCE_ID);
+
+      m.addSource(POINTS_SOURCE_ID, {
+        type: 'geojson',
+        data: geojson,
+        cluster: true,
+        clusterMaxZoom: 16,
+        clusterRadius: 56,
+      });
+
+      m.addLayer({
+        id: POINTS_CLUSTER_LAYER_ID,
+        type: 'symbol',
+        source: POINTS_SOURCE_ID,
+        filter: ['has', 'point_count'],
+        layout: { 'icon-allow-overlap': true },
+      });
+
+      // Los clusters se dibujan como HTML markers (mismo estilo que antes con leaflet.markercluster).
+      const clusterMarkers = new Map<number, maplibregl.Marker>();
+      function renderClusters() {
+        if (!m.getSource(POINTS_SOURCE_ID)) return;
+        const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
+          filter: ['has', 'point_count'],
+        });
+        const seenIds = new Set<number>();
+        features.forEach((feature: maplibregl.MapGeoJSONFeature) => {
+          const clusterId = feature.properties?.cluster_id as number;
+          const count = feature.properties?.point_count as number;
+          if (clusterId == null || seenIds.has(clusterId)) return;
+          seenIds.add(clusterId);
+          const coords = (feature.geometry as GeoJSONPoint).coordinates as [
+            number,
+            number,
+          ];
+          let marker = clusterMarkers.get(clusterId);
+          if (!marker) {
+            const el = document.createElement('div');
+            el.innerHTML = clusterMarkerHtml(count);
+            marker = new maplibregl.Marker({
+              element: el.firstElementChild as HTMLElement,
+            });
+            el.firstElementChild?.addEventListener('click', () => {
+              const source = m.getSource(
+                POINTS_SOURCE_ID,
+              ) as maplibregl.GeoJSONSource;
+              source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
+                m.easeTo({ center: coords, zoom });
+              });
+            });
+            clusterMarkers.set(clusterId, marker);
+          }
+          marker.setLngLat(coords).addTo(m);
+        });
+        clusterMarkers.forEach((marker, id) => {
+          if (!seenIds.has(id)) {
+            marker.remove();
+            clusterMarkers.delete(id);
+          }
+        });
+      }
+
+      function renderAll() {
+        renderClusters();
+        renderIndividualMarkers();
+      }
+
+      m.on('data', renderAll);
+      m.on('move', renderAll);
+      renderAll();
+
+      return () => {
+        m.off('data', renderAll);
+        m.off('move', renderAll);
+        clusterMarkers.forEach((marker) => marker.remove());
+        clearIndividualMarkers();
+        if (m.getLayer(POINTS_CLUSTER_LAYER_ID))
+          m.removeLayer(POINTS_CLUSTER_LAYER_ID);
+        if (m.getSource(POINTS_SOURCE_ID)) m.removeSource(POINTS_SOURCE_ID);
+      };
+    }
+
+    if (m.isStyleLoaded()) return setup();
+    let cleanup: (() => void) | undefined;
+    const onLoad = () => {
+      cleanup = setup();
+    };
+    m.once('load', onLoad);
     return () => {
-      map.removeLayer(group);
+      m.off('load', onLoad);
+      cleanup?.();
     };
   }, [map, points]);
+}
 
-  return null;
+const ROUTE_SOURCE_ID = 'salimos-route';
+const ROUTE_GLOW_LAYER_ID = 'salimos-route-glow';
+const ROUTE_LINE_LAYER_ID = 'salimos-route-line';
+
+/** Dibuja la ruta como una única línea con degradado nativo de MapLibre (`line-gradient`). */
+function useRouteLayer(
+  map: maplibregl.Map | null,
+  routeCoordinates?: [number, number][],
+) {
+  const startMarkerRef = React.useRef<maplibregl.Marker | null>(null);
+
+  React.useEffect(() => {
+    if (!map) return;
+    const m = map;
+
+    function clear() {
+      if (m.getLayer(ROUTE_GLOW_LAYER_ID)) m.removeLayer(ROUTE_GLOW_LAYER_ID);
+      if (m.getLayer(ROUTE_LINE_LAYER_ID)) m.removeLayer(ROUTE_LINE_LAYER_ID);
+      if (m.getSource(ROUTE_SOURCE_ID)) m.removeSource(ROUTE_SOURCE_ID);
+      startMarkerRef.current?.remove();
+      startMarkerRef.current = null;
+    }
+
+    function setup() {
+      clear();
+      if (!routeCoordinates || routeCoordinates.length < 2) return;
+
+      const coordinates = routeCoordinates.map(([lat, lng]) => [lng, lat]);
+      m.addSource(ROUTE_SOURCE_ID, {
+        type: 'geojson',
+        lineMetrics: true,
+        data: {
+          type: 'Feature',
+          properties: {},
+          geometry: { type: 'LineString', coordinates },
+        },
+      });
+
+      const gradient: unknown[] = [
+        'interpolate',
+        ['linear'],
+        ['line-progress'],
+      ];
+      BRAND_GRADIENT.forEach((color, index) => {
+        gradient.push(index / (BRAND_GRADIENT.length - 1), color);
+      });
+
+      m.addLayer({
+        id: ROUTE_GLOW_LAYER_ID,
+        type: 'line',
+        source: ROUTE_SOURCE_ID,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-gradient': gradient as never,
+          'line-width': 12,
+          'line-opacity': 0.18,
+        },
+      });
+      m.addLayer({
+        id: ROUTE_LINE_LAYER_ID,
+        type: 'line',
+        source: ROUTE_SOURCE_ID,
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        paint: {
+          'line-gradient': gradient as never,
+          'line-width': 5,
+          'line-opacity': 0.95,
+        },
+      });
+
+      const start = document.createElement('div');
+      start.style.cssText = `
+        width: 14px; height: 14px; border-radius: 50%;
+        background: ${colors.brandPink}; border: 3px solid #ffffff;
+      `;
+      startMarkerRef.current = new maplibregl.Marker({ element: start })
+        .setLngLat(coordinates[0] as [number, number])
+        .addTo(m);
+
+      const bounds = coordinates.reduce(
+        (b, c) => b.extend(c as [number, number]),
+        new maplibregl.LngLatBounds(
+          coordinates[0] as [number, number],
+          coordinates[0] as [number, number],
+        ),
+      );
+      m.fitBounds(bounds, { padding: 40 });
+    }
+
+    if (m.isStyleLoaded()) setup();
+    else m.once('load', setup);
+
+    return clear;
+  }, [map, routeCoordinates]);
 }
 
 export function MapViewComponent({
@@ -295,9 +439,12 @@ export function MapViewComponent({
   onPointPress,
   children,
 }: MapViewProps) {
-  React.useEffect(injectLeafletTheme, []);
-
+  const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const [map, setMap] = React.useState<maplibregl.Map | null>(null);
   const center = region || initialRegion;
+  const onPressRef = React.useRef(onPress);
+  onPressRef.current = onPress;
+
   const markers = React.Children.toArray(children).filter((child) => {
     if (!React.isValidElement(child)) return false;
     const props = child.props as Partial<MarkerProps>;
@@ -307,102 +454,102 @@ export function MapViewComponent({
     );
   }) as React.ReactElement<MarkerProps>[];
 
-  const routeSegments = routeCoordinates
-    ? buildGradientSegments(routeCoordinates, BRAND_GRADIENT)
-    : [];
+  // Clave serializable de los datos de cada marcador (sin `children`/`onPress`,
+  // que no son serializables y con `children` en concreto rompían el
+  // `JSON.stringify` al incluir un elemento React con referencias circulares).
+  const markersKey = markers
+    .map((marker) => {
+      const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
+        marker.props;
+      return JSON.stringify({
+        lat: coordinate.latitude,
+        lng: coordinate.longitude,
+        slug: discoteca?.slug,
+        title,
+        color: discoteca?.color,
+        selected,
+        hasAlerts,
+        eventImage,
+      });
+    })
+    .join('|');
+
+  React.useEffect(() => {
+    if (!containerRef.current) return;
+    const instance = new maplibregl.Map({
+      container: containerRef.current,
+      style: mapStyle as unknown as maplibregl.StyleSpecification,
+      center: [center?.longitude ?? -6.2242, center?.latitude ?? 36.5982],
+      zoom: 13,
+    });
+    instance.addControl(
+      new maplibregl.NavigationControl({ showCompass: false }),
+      'top-right',
+    );
+    instance.on('click', (event: maplibregl.MapMouseEvent) => {
+      // Ignora los clicks que ya gestionó un marcador HTML (paran la propagación).
+      onPressRef.current?.({
+        latitude: event.lngLat.lat,
+        longitude: event.lngLat.lng,
+      });
+    });
+    setMap(instance);
+    return () => instance.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  usePointsClusterLayer(map, points, onPointPress);
+  useRouteLayer(map, routeCoordinates);
+
+  // Marcadores de discotecas: se recrean cuando cambian los children.
+  React.useEffect(() => {
+    if (!map) return;
+    const m = map;
+    const instances = markers.map((marker) => {
+      const {
+        coordinate,
+        onPress: onMarkerPress,
+        discoteca,
+        title,
+        selected,
+        hasAlerts,
+        eventImage,
+      } = marker.props;
+      const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
+      const color = discoteca?.color ?? '#ff4d4d';
+      const discotecaFallback: Discoteca = {
+        ...discoteca,
+        nombre,
+        color,
+        imagen: discoteca?.imagen ?? DEFAULT_DISCOTECA_IMAGE,
+      } as Discoteca;
+
+      const el = document.createElement('div');
+      el.innerHTML = discotecaMarkerHtml(
+        discoteca ?? discotecaFallback,
+        Boolean(selected),
+        Boolean(hasAlerts),
+        eventImage,
+      );
+      const markerEl = el.firstElementChild as HTMLElement;
+      markerEl.style.cursor = 'pointer';
+      markerEl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        onMarkerPress?.();
+      });
+
+      return new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
+        .setLngLat([coordinate.longitude, coordinate.latitude])
+        .addTo(m);
+    });
+
+    return () => instances.forEach((instance) => instance.remove());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, markersKey]);
 
   return (
     <View style={[styles.webMap, style]}>
-      <MapContainer
-        center={[center?.latitude ?? 36.5982, center?.longitude ?? -6.2242]}
-        zoom={13}
-        scrollWheelZoom
-        style={{ width: '100%', height: '100%' }}
-      >
-        <MapClickHandler onPress={onPress} />
-        <TileLayer attribution={TILE_ATTRIBUTION} url={TILE_URL} />
-
-        {markers.map((marker, index) => {
-          const {
-            coordinate,
-            onPress: onMarkerPress,
-            discoteca,
-            title,
-            selected,
-            hasAlerts,
-            eventImage,
-          } = marker.props;
-          const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
-          const color = discoteca?.color ?? '#ff4d4d';
-          const discotecaFallback: Discoteca = {
-            ...discoteca,
-            nombre,
-            color,
-            imagen: discoteca?.imagen ?? DEFAULT_DISCOTECA_IMAGE,
-          } as Discoteca;
-          const position: [number, number] = [
-            coordinate.latitude,
-            coordinate.longitude,
-          ];
-
-          return (
-            <Marker
-              key={`${discoteca?.id ?? title ?? 'marker'}-${index}`}
-              position={position}
-              icon={discotecaIcon(
-                discoteca ?? discotecaFallback,
-                Boolean(selected),
-                Boolean(hasAlerts),
-                eventImage,
-              )}
-              eventHandlers={{ click: onMarkerPress ?? (() => undefined) }}
-            >
-              <Popup>{nombre}</Popup>
-            </Marker>
-          );
-        })}
-
-        <PointsClusterLayer points={points} onPointPress={onPointPress} />
-
-        {routeSegments.map((segment, index) => (
-          <Polyline
-            key={`route-glow-${index}`}
-            positions={segment.positions}
-            pathOptions={{
-              color: segment.color,
-              weight: 12,
-              opacity: 0.18,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          />
-        ))}
-        {routeSegments.map((segment, index) => (
-          <Polyline
-            key={`route-line-${index}`}
-            positions={segment.positions}
-            pathOptions={{
-              color: segment.color,
-              weight: 5,
-              opacity: 0.95,
-              lineCap: 'round',
-              lineJoin: 'round',
-            }}
-          />
-        ))}
-        {routeCoordinates && routeCoordinates.length > 1 && (
-          <CircleMarker
-            center={routeCoordinates[0]}
-            radius={7}
-            pathOptions={{
-              color: '#ffffff',
-              weight: 3,
-              fillColor: colors.brandPink,
-              fillOpacity: 1,
-            }}
-          />
-        )}
-      </MapContainer>
+      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
     </View>
   );
 }

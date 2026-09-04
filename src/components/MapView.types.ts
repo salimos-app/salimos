@@ -46,8 +46,4 @@ export interface MapViewProps {
   onPointPress?: (point: SimpleMapPoint) => void;
 }
 
-export const TILE_URL =
-  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}.png';
-
-export const TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>';
+export { mapStyle, MAP_ATTRIBUTION } from '../theme/mapStyle';
