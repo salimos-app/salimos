@@ -1,4 +1,4 @@
-import { Evento, Location } from '../types/evento';
+import { Evento, Location, TicketType } from '../types/evento';
 import { DiscotecaSinColor } from '../types/discoteca';
 import { getApiBaseUrls } from '../config/api';
 
@@ -104,6 +104,7 @@ function normalizeEventosConImagen(payload: unknown): Evento[] {
           address: { streetAddress: location?.addressComplete ?? '' },
         },
         image: typeof item.image === 'string' ? item.image : undefined,
+        id: typeof item.id === 'string' ? item.id : undefined,
       };
     });
 }
@@ -274,4 +275,78 @@ export async function fetchProximosEventos(slug: string): Promise<Evento[]> {
   }
 
   throw lastError ?? new Error('No se pudo cargar la lista de eventos.');
+}
+
+function normalizeTicketTypes(payload: unknown): TicketType[] {
+  if (typeof payload !== 'object' || payload === null) {
+    return [];
+  }
+
+  const rawList = (payload as Record<string, unknown>).data;
+  if (!Array.isArray(rawList)) {
+    return [];
+  }
+
+  return rawList
+    .filter(
+      (item): item is Record<string, unknown> =>
+        typeof item === 'object' && item !== null && typeof (item as Record<string, unknown>).id === 'string',
+    )
+    .map((item): TicketType => {
+      const options = Array.isArray(item.options) ? item.options : [];
+      return {
+        id: item.id as string,
+        name: typeof item.name === 'string' ? item.name : '',
+        isSoldOut: item.isSoldOut === true,
+        options: options
+          .filter((opt): opt is Record<string, unknown> => typeof opt === 'object' && opt !== null)
+          .map((opt) => ({
+            id: String(opt.id ?? ''),
+            name: typeof opt.name === 'string' ? opt.name : '',
+            price: typeof opt.price === 'number' ? opt.price : 0,
+            isSoldOut: opt.isSoldOut === true,
+          })),
+      };
+    });
+}
+
+/**
+ * Tipos de entrada y precios de un evento concreto (tramos, disponibilidad).
+ * Necesita `eventId` (el `id` que trae `fetchProximosEventos`, no el `code`
+ * corto de la URL pública) porque Fourvenues indexa los precios por ahí.
+ * @param slug Identificador del microsite (ej: "banana")
+ * @param eventId Id interno del evento (`Evento.id`)
+ */
+export async function fetchEventTicketTypes(
+  slug: string,
+  eventId: string,
+): Promise<TicketType[]> {
+  const urls = getApiBaseUrls().map(
+    (baseUrl) => `${baseUrl}/api/microsites/${slug}/events/${eventId}/tickets-types`,
+  );
+  let lastError: unknown = null;
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      return normalizeTicketTypes(payload);
+    } catch (error) {
+      lastError = error;
+      console.warn(`Fallo cargando precios de entradas desde ${url}:`, error);
+    }
+  }
+
+  throw lastError ?? new Error('No se pudieron cargar los precios de las entradas.');
+}
+
+/** Precio más barato disponible entre los tipos de entrada de un evento, o `null` si no hay ninguno a la venta. */
+export function precioDesde(tiposEntrada: TicketType[]): number | null {
+  const precios = tiposEntrada
+    .filter((tipo) => !tipo.isSoldOut)
+    .flatMap((tipo) => tipo.options.filter((opt) => !opt.isSoldOut).map((opt) => opt.price));
+  return precios.length > 0 ? Math.min(...precios) : null;
 }

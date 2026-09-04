@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { Discoteca } from '../types/discoteca';
 import { Evento } from '../types/evento';
-import { fetchProximosEventos } from '../services/eventosApi';
+import { fetchProximosEventos, fetchEventTicketTypes, precioDesde } from '../services/eventosApi';
 import { colors, gradients } from '../theme/colors';
 
 interface Props {
@@ -56,6 +56,8 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const [preciosPorId, setPreciosPorId] = useState<Record<string, number | null>>({});
+  const preciosSolicitados = useRef<Set<string>>(new Set());
 
   const loadEventos = useCallback(async () => {
     try {
@@ -101,6 +103,22 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
     [eventos, selectedDay]
   );
 
+  // Los precios se piden solo para los eventos del día seleccionado (pocos a
+  // la vez), no para todo el listado — evita disparar de golpe una petición
+  // por cada evento de la discoteca.
+  useEffect(() => {
+    const pendientes = eventosDelDia.filter(
+      (evento) => evento.id && !preciosSolicitados.current.has(evento.id)
+    );
+    pendientes.forEach((evento) => {
+      const id = evento.id!;
+      preciosSolicitados.current.add(id);
+      fetchEventTicketTypes(discoteca.slug, id)
+        .then((tipos) => setPreciosPorId((prev) => ({ ...prev, [id]: precioDesde(tipos) })))
+        .catch(() => setPreciosPorId((prev) => ({ ...prev, [id]: null })));
+    });
+  }, [eventosDelDia, discoteca.slug]);
+
   // El primer evento del día seleccionado se destaca grande debajo del
   // calendario; si ese día tiene más de uno, el resto va en la lista.
   const eventoDestacado = eventosDelDia[0] ?? null;
@@ -108,6 +126,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
 
   const renderEvento = ({ item }: { item: Evento }) => {
     const fecha = formatFecha(item.startDate);
+    const precio = item.id ? preciosPorId[item.id] : undefined;
     return (
       <View style={styles.eventoCard}>
         {item.image ? (
@@ -125,6 +144,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
           <View style={styles.eventoDetalle}>
             <Text style={styles.eventoHora}>🕐 {formatHora(item.startDate)}</Text>
             <Text style={styles.eventoUbicacion}>📍 {item.location.name}</Text>
+            {precio != null && <Text style={styles.eventoPrecio}>💶 Desde {precio}€</Text>}
           </View>
         </View>
       </View>
@@ -239,6 +259,9 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
                     <View style={styles.heroDetalle}>
                       <Text style={styles.heroHora}>🕐 {formatHora(eventoDestacado.startDate)}</Text>
                       <Text style={styles.heroUbicacion}>📍 {eventoDestacado.location.name}</Text>
+                      {eventoDestacado.id && preciosPorId[eventoDestacado.id] != null && (
+                        <Text style={styles.heroPrecio}>💶 Desde {preciosPorId[eventoDestacado.id]}€</Text>
+                      )}
                     </View>
                   </View>
                 </View>
@@ -460,6 +483,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  heroPrecio: {
+    color: colors.brandPink,
+    fontSize: 13,
+    fontWeight: '800',
+  },
   eventoCard: {
     flexDirection: 'row',
     backgroundColor: colors.backgroundCard,
@@ -530,5 +558,10 @@ const styles = StyleSheet.create({
   eventoUbicacion: {
     color: colors.textSecondary,
     fontSize: 13,
+  },
+  eventoPrecio: {
+    color: colors.brandPink,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });
