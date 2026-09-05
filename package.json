@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "main": "expo/AppEntry",
   "dependencies": {
+    "culori": "^4.0.2",
     "expo": "~57.0.13",
     "expo-linear-gradient": "~57.0.1",
     "expo-location": "~57.0.10",
@@ -16,6 +17,7 @@
     "react-native-webview": "13.16.1"
   },
   "devDependencies": {
+    "@types/culori": "^4.0.1",
     "@types/react": "~19.2.2",
     "eslint": "^9.39.5",
     "eslint-config-expo": "^57.0.1",
