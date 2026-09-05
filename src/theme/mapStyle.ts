@@ -26,18 +26,22 @@ const sources = {
  * (agua, parques, edificios, vías, límites, labels de calles/lugares).
  * Se evita el ruido de POIs/iconos que trae el estilo por defecto.
  */
+/** Colores propios del mapa (terreno y agua), independientes del tema de la UI. */
+const MAP_TERRAIN_COLOR = '#060711';
+const MAP_WATER_COLOR = '#041C3E';
+
 const layers = [
   {
     id: 'background',
     type: 'background',
-    paint: { 'background-color': colors.background },
+    paint: { 'background-color': MAP_TERRAIN_COLOR },
   },
   {
     id: 'water',
     type: 'fill',
     source: 'openmaptiles',
     'source-layer': 'water',
-    paint: { 'fill-color': colors.backgroundLight },
+    paint: { 'fill-color': MAP_WATER_COLOR },
   },
   {
     id: 'landuse-park',
@@ -118,7 +122,7 @@ const layers = [
     },
     paint: {
       'text-color': colors.textSecondary,
-      'text-halo-color': colors.background,
+      'text-halo-color': MAP_TERRAIN_COLOR,
       'text-halo-width': 1.2,
     },
   },
@@ -136,7 +140,7 @@ const layers = [
     },
     paint: {
       'text-color': colors.textMuted,
-      'text-halo-color': colors.background,
+      'text-halo-color': MAP_TERRAIN_COLOR,
       'text-halo-width': 1,
     },
   },
