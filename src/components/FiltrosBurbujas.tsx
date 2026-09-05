@@ -22,6 +22,8 @@ interface Props {
   onSelect: (id: string) => void;
   /** Se llama al tocar el hub mientras el desplegable ya está abierto (lo cierra). */
   onCollapse: () => void;
+  /** Se llama cada vez que el desplegable se abre o se cierra (p.ej. para desenfocar el mapa mientras está abierto). */
+  onOpenChange?: (abierto: boolean) => void;
 }
 
 const LOGO = require('../../assets/isotipo.png');
@@ -36,7 +38,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 // animarla junto al fade de apertura no da un resultado fiable multiplataforma.
 const SCRIM_COLOR = colors.background;
 const SCRIM_MAX_OPACITY = 0.6;
-const SCRIM_BLUR_INTENSITY = 40;
+const SCRIM_BLUR_INTENSITY = 100;
 
 // Hub (el pin central con el logo).
 const HUB_SIZE = 96;
@@ -91,9 +93,13 @@ const STEP = 50;
  * hub de nuevo mientras está abierto lo cierra y dispara `onCollapse`
  * (el padre usa esto para montar el plan de la noche).
  */
-export default function FiltrosBurbujas({ opciones, onSelect, onCollapse }: Props) {
+export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpenChange }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [progreso] = useState(() => new Animated.Value(0));
+
+  useEffect(() => {
+    onOpenChange?.(abierto);
+  }, [abierto, onOpenChange]);
 
   useEffect(() => {
     const anim = Animated.timing(progreso, {

@@ -44,6 +44,15 @@ export interface MapViewProps {
   points?: SimpleMapPoint[];
   /** Se llama al tocar uno de `points` (abre la tarjeta correspondiente en la app). */
   onPointPress?: (point: SimpleMapPoint) => void;
+  /**
+   * Desenfoca el mapa (p.ej. mientras el desplegable del hub está abierto).
+   * Solo tiene efecto en web: ahí, `backdrop-filter` en una capa encima NO
+   * desenfoca el canvas WebGL de MapLibre (limitación conocida del
+   * navegador), así que hay que aplicar el blur directo al mapa en vez de
+   * a una capa por encima. En nativo el blur ya lo resuelve `BlurView` desde
+   * afuera (sí funciona ahí), así que esta prop no hace nada.
+   */
+  blurred?: boolean;
 }
 
 export { mapStyle, MAP_ATTRIBUTION } from '../theme/mapStyle';

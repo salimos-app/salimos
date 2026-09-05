@@ -484,6 +484,10 @@ function useRouteLayer(
   }, [map, routeCoordinates]);
 }
 
+/** Blur del mapa mientras el hub está abierto (ver `MapViewProps.blurred`). */
+const MAP_BLUR_PX = 6;
+const MAP_BLUR_TRANSITION_MS = 300;
+
 export function MapViewComponent({
   style,
   initialRegion,
@@ -492,6 +496,7 @@ export function MapViewComponent({
   routeCoordinates,
   points = [],
   onPointPress,
+  blurred,
   children,
 }: MapViewProps) {
   const containerRef = React.useRef<HTMLDivElement | null>(null);
@@ -649,7 +654,18 @@ export function MapViewComponent({
 
   return (
     <View style={[styles.webMap, style]}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+      <div
+        ref={containerRef}
+        style={{
+          width: '100%',
+          height: '100%',
+          // `backdrop-filter` desde una capa encima no desenfoca el canvas
+          // WebGL de MapLibre (limitación del navegador) — hay que aplicar
+          // el blur directo acá, sobre el propio mapa.
+          filter: blurred ? `blur(${MAP_BLUR_PX}px)` : 'none',
+          transition: `filter ${MAP_BLUR_TRANSITION_MS}ms ease`,
+        }}
+      />
     </View>
   );
 }

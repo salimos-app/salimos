@@ -184,6 +184,9 @@ export default function App() {
   const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
+  // Desenfoca el mapa mientras el desplegable del hub está abierto (ver
+  // FiltrosBurbujas.onOpenChange y MapViewProps.blurred).
+  const [hubAbierto, setHubAbierto] = useState(false);
   // Categoría cuyo listado por cercanía está abierto (al tocar una burbuja
   // que no sea "discotecas": esa se resuelve directo a la mejor valorada,
   // ver `handleBubbleSelect`).
@@ -466,6 +469,7 @@ export default function App() {
         {viewMode === 'map' ? (
           <MapViewComponent
             style={styles.map}
+            blurred={hubAbierto}
             initialRegion={{
               latitude: centroMapa.latitude,
               longitude: centroMapa.longitude,
@@ -541,7 +545,12 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      <FiltrosBurbujas opciones={FILTROS} onSelect={handleBubbleSelect} onCollapse={handleHubCollapse} />
+      <FiltrosBurbujas
+        opciones={FILTROS}
+        onSelect={handleBubbleSelect}
+        onCollapse={handleHubCollapse}
+        onOpenChange={setHubAbierto}
+      />
 
       {categoriaOverlay && (
         <CategoriaCercaniaOverlay
