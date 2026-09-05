@@ -32,6 +32,7 @@ import { getCurrentLocation } from './src/services/location';
 import { LatLng } from './src/services/directionsApi';
 import { forEachLimit } from './src/utils/concurrency';
 import { ordenarPorCercania } from './src/utils/geo';
+import { initTelemetria, track } from './src/services/telemetria';
 
 // Acento de color por discoteca: es un detalle puramente visual (no lo
 // manda el backend), se asigna por índice ciclando esta paleta.
@@ -111,6 +112,12 @@ export default function App() {
   const [paradasTaxi, setParadasTaxi] = useState<ParadaTaxi[]>([]);
   const [telefonoRadioTaxi, setTelefonoRadioTaxi] = useState<string | undefined>(undefined);
   const [cargandoInicial, setCargandoInicial] = useState(true);
+
+  // Registro anónimo de la instalación (UUID + metadatos de la descarga) y
+  // arranque de la telemetría de uso. Ver src/services/telemetria.ts.
+  useEffect(() => {
+    initTelemetria();
+  }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -287,6 +294,7 @@ export default function App() {
   };
 
   const handleMarkerPress = (discoteca: Discoteca) => {
+    track('discoteca_seleccionada', { slug: discoteca.slug });
     setSelectedMarkerSlug(discoteca.slug);
     setSelectedDiscoteca(null);
     setSelectedPoint(null);
@@ -311,6 +319,7 @@ export default function App() {
   // valorada (mismo flujo que tocar su pin); el resto abre el listado por
   // cercanía de esa categoría (ver el overlay más abajo).
   const handleBubbleSelect = (id: string) => {
+    track('filtro_seleccionado', { id });
     if (id === 'discotecas') {
       const mejor = mejorDiscoteca(discotecas);
       if (mejor) handleMarkerPress(mejor);
@@ -332,6 +341,7 @@ export default function App() {
   // respuesta, mejor discoteca, taxi de vuelta) y lo calcula automáticamente
   // en el planificador (ver RoutePlannerScreen.autoPlan).
   const construirPlanOptimo = async (modo: 'casa' | 'bar') => {
+    track('plan_optimo', { modo });
     setPreguntaPlan(false);
     const mejor = mejorDiscoteca(discotecas);
     if (!mejor) return;
@@ -371,10 +381,12 @@ export default function App() {
   };
 
   const openEventos = (discoteca: Discoteca) => {
+    track('ver_eventos', { slug: discoteca.slug });
     setSelectedDiscoteca(discoteca);
   };
 
   const openPlanificador = (discoteca: Discoteca) => {
+    track('planificar_ruta', { slug: discoteca.slug });
     setPlannerDiscoteca(discoteca);
   };
 
@@ -491,14 +503,20 @@ export default function App() {
       <View style={styles.viewToggle}>
         <TouchableOpacity
           style={[styles.viewToggleBtn, viewMode === 'map' && styles.viewToggleBtnActivo]}
-          onPress={() => setViewMode('map')}
+          onPress={() => {
+            track('cambio_vista', { modo: 'map' });
+            setViewMode('map');
+          }}
           activeOpacity={0.85}
         >
           <Text style={styles.viewToggleIcon}>🗺️</Text>
         </TouchableOpacity>
         <TouchableOpacity
           style={[styles.viewToggleBtn, viewMode === 'list' && styles.viewToggleBtnActivo]}
-          onPress={() => setViewMode('list')}
+          onPress={() => {
+            track('cambio_vista', { modo: 'list' });
+            setViewMode('list');
+          }}
           activeOpacity={0.85}
         >
           <Text style={styles.viewToggleIcon}>📋</Text>
