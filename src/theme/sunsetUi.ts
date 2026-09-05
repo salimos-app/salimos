@@ -9,7 +9,8 @@ import { getSunsetColor } from './sunsetPalette';
 
 /**
  * Paleta cíclica para distinguir elementos del mismo tipo (p.ej. una
- * discoteca por pin), repartida a lo largo de toda la curva sunset → night.
+ * discoteca por pin), repartida a lo largo de toda la curva sunset → dusk
+ * (sin llegar al azul).
  */
 export const sunsetCyclePalette = [
   getSunsetColor(0), // amanecer / amarillo cálido
@@ -18,7 +19,7 @@ export const sunsetCyclePalette = [
   getSunsetColor(0.55), // magenta
   getSunsetColor(0.7), // magenta-violeta
   getSunsetColor(0.85), // violeta
-  getSunsetColor(1), // azul-noche
+  getSunsetColor(1), // violeta oscuro (justo antes del azul)
 ];
 
 /** Tokens semánticos puntuales, pensados para acciones/estados de UI. */
