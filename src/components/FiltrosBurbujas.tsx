@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Animated, Easing, Image, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 
 export interface FiltroOpcion {
@@ -93,7 +94,11 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse }: Prop
                 >
                   <Text style={styles.bubbleIcon}>{opcion.icon}</Text>
                 </Pressable>
-                <Text style={[styles.bubbleLabel, { color: opcion.color }]} numberOfLines={1}>
+                <Text
+                  variant="caption"
+                  style={[styles.bubbleLabel, { color: opcion.color }]}
+                  numberOfLines={1}
+                >
                   {opcion.label}
                 </Text>
               </Animated.View>
@@ -177,8 +182,6 @@ const styles = StyleSheet.create({
   },
   bubbleLabel: {
     marginTop: 4,
-    fontSize: 10,
-    fontWeight: '700',
     textAlign: 'center',
   },
 });

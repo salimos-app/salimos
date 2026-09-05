@@ -1,10 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import * as SplashScreen from 'expo-splash-screen';
+import { useFonts } from 'expo-font';
+import Text from './src/components/Text';
 import { colors } from './src/theme/colors';
+import { CATEGORY_COLORS } from './src/theme/categoryColors';
+import { FONTS_TO_LOAD } from './src/theme/typography';
 import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
-import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
 import RoutePlannerScreen, { AutoPlan } from './src/screens/RoutePlannerScreen';
 import PointCard from './src/components/PointCard';
@@ -33,14 +37,13 @@ import { LatLng } from './src/services/directionsApi';
 import { forEachLimit } from './src/utils/concurrency';
 import { ordenarPorCercania } from './src/utils/geo';
 
-// Acento de color por discoteca: es un detalle puramente visual (no lo
-// manda el backend), se asigna por índice ciclando esta paleta.
-const DISCOTECA_COLOR_PALETTE = [colors.neonPink, colors.neonYellow, colors.neonPurple, colors.neonBlue, colors.neonGreen];
-
+// Acento de color de discoteca: es un detalle puramente visual (no lo manda
+// el backend) — un único color fijo por categoría, igual que taxis/bares/
+// supermercados (ver CATEGORY_COLORS).
 function conColor(discotecas: DiscotecaSinColor[]): Discoteca[] {
-  return discotecas.map((discoteca, index) => ({
+  return discotecas.map((discoteca) => ({
     ...discoteca,
-    color: DISCOTECA_COLOR_PALETTE[index % DISCOTECA_COLOR_PALETTE.length],
+    color: CATEGORY_COLORS.discoteca,
   }));
 }
 
@@ -59,6 +62,8 @@ const FILTROS: FiltroOpcion[] = [
   { id: 'taxis', icon: '🚕', label: 'Taxis', color: colors.neonYellow },
 ];
 
+SplashScreen.preventAutoHideAsync();
+
 function filtroDe(point: SimpleMapPoint): FiltroCategoria {
   if (point.kind === 'taxi') return 'taxis';
   if (point.kind === 'bar' || point.kind === 'pub') return 'bares';
@@ -75,7 +80,7 @@ function taxiPointsFrom(paradasTaxi: ParadaTaxi[], telefono?: string): SimpleMap
     icon: '🚕',
     kind: 'taxi',
     phone: telefono,
-    color: colors.neonYellow,
+    color: CATEGORY_COLORS.taxi,
   }));
 }
 
@@ -103,6 +108,14 @@ function coordsLocalesPorSlug(discotecas: Discoteca[]): Record<string, Discoteca
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts(FONTS_TO_LOAD);
+
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync();
+    }
+  }, [fontsLoaded]);
+
   // Todo (discotecas, sitios, paradas de taxi) llega del backend: no hay
   // ningún dato de negocio hardcodeado en el bundle, así que se arranca
   // vacío y se muestra un loader hasta que responde la primera carga.
@@ -378,6 +391,10 @@ export default function App() {
     setPlannerDiscoteca(discoteca);
   };
 
+  if (!fontsLoaded) {
+    return null;
+  }
+
   if (selectedDiscoteca) {
     return (
       <View style={styles.container}>
@@ -415,7 +432,7 @@ export default function App() {
       <View style={[styles.container, styles.centerContent]}>
         <StatusBar style="light" />
         <ActivityIndicator size="large" color={colors.neonPink} />
-        <Text style={styles.loadingText}>Cargando discotecas, bares y taxis...</Text>
+        <Text variant="bodySmall" style={styles.loadingText}>Cargando discotecas, bares y taxis...</Text>
       </View>
     );
   }
@@ -467,9 +484,7 @@ export default function App() {
                     hasAlerts={(alertsBySlug[discoteca.slug]?.length ?? 0) > 0}
                     eventImage={eventImageBySlug[discoteca.slug] ?? undefined}
                     onPress={() => handleMarkerPress(discoteca)}
-                  >
-                    <DiscotecaMarker nombre={discoteca.nombre} color={discoteca.color} selected={selected} />
-                  </MarkerComponent>
+                  />
                 );
               })}
           </MapViewComponent>
@@ -568,7 +583,6 @@ const styles = StyleSheet.create({
   loadingText: {
     color: colors.textSecondary,
     marginTop: 12,
-    fontSize: 16,
   },
   mapContainer: {
     flex: 1,

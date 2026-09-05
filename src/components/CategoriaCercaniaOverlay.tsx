@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 import DiscotecasListView from './DiscotecasListView';
 import { SimpleMapPoint } from './MapView';
@@ -23,9 +24,9 @@ export default function CategoriaCercaniaOverlay({ titulo, points, userLocation,
   return (
     <View style={styles.overlay}>
       <View style={styles.header}>
-        <Text style={styles.titulo}>{titulo}</Text>
+        <Text variant="heading" style={styles.titulo}>{titulo}</Text>
         <TouchableOpacity onPress={onClose} style={styles.close}>
-          <Text style={styles.closeText}>✕</Text>
+          <Text variant="label" style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
       <DiscotecasListView
@@ -73,8 +74,6 @@ const styles = StyleSheet.create({
   },
   titulo: {
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
     flex: 1,
     marginRight: 8,
   },
@@ -88,7 +87,5 @@ const styles = StyleSheet.create({
   },
   closeText: {
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: 'bold',
   },
 });

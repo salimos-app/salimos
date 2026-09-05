@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { View, Text, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import { View, Image, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 import { Discoteca } from '../types/discoteca';
 import { SimpleMapPoint } from './MapView';
@@ -61,13 +62,13 @@ export default function DiscotecasListView({
     <ScrollView style={styles.container} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
       {vacio && (
         <View style={styles.vacio}>
-          <Text style={styles.vacioText}>No hay nada que mostrar con estos filtros.</Text>
+          <Text variant="body" style={styles.vacioText}>No hay nada que mostrar con estos filtros.</Text>
         </View>
       )}
 
       {discotecasOrdenadas.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>🪩 Discotecas</Text>
+          <Text variant="label" style={styles.sectionTitle}>🪩 Discotecas</Text>
           {discotecasOrdenadas.map(({ discoteca, coords }, index) => {
             const distancia = userLocation ? distanceMeters(userLocation, coords) : undefined;
             const esOptima = index === 0 && !!userLocation;
@@ -84,23 +85,23 @@ export default function DiscotecasListView({
                 <Image source={{ uri: imagen }} style={styles.discoImagen} />
                 <View style={styles.discoInfo}>
                   <View style={styles.discoNombreRow}>
-                    <Text style={styles.discoNombre} numberOfLines={1}>
-                      {discoteca.nombre} 
+                    <Text variant="label" style={styles.discoNombre} numberOfLines={1}>
+                      {discoteca.nombre}
                     </Text>
                     {hasAlerts && <View style={styles.alertDot} />}
                   </View>
-                  <Text style={styles.discoSub} numberOfLines={1}>
+                  <Text variant="bodySmall" style={styles.discoSub} numberOfLines={1}>
                     {discoteca.genero}
                     {discoteca.rating != null ? ` · ⭐ ${discoteca.rating.toFixed(1)}` : ''}
                     {discoteca.precioEntrada != null ? ` · ${discoteca.precioEntrada}€` : ''}
                   </Text>
-                  <Text style={styles.discoDireccion} numberOfLines={1}>
+                  <Text variant="bodySmall" style={styles.discoDireccion} numberOfLines={1}>
                     📍 {discoteca.direccion}
                   </Text>
                 </View>
                 {distancia != null && (
                   <View style={[styles.distBadge, esOptima && styles.distBadgeOptima]}>
-                    <Text style={[styles.distBadgeText, esOptima && styles.distBadgeTextOptima]}>
+                    <Text variant="caption" style={[styles.distBadgeText, esOptima && styles.distBadgeTextOptima]}>
                       {esOptima ? '⭐ ' : ''}
                       {formatDistance(distancia)}
                     </Text>
@@ -114,7 +115,7 @@ export default function DiscotecasListView({
 
       {puntosOrdenados.length > 0 && (
         <>
-          <Text style={styles.sectionTitle}>📍 Otros lugares</Text>
+          <Text variant="label" style={styles.sectionTitle}>📍 Otros lugares</Text>
           {puntosOrdenados.map((point) => {
             const distancia = userLocation ? distanceMeters(userLocation, point) : undefined;
             return (
@@ -128,17 +129,17 @@ export default function DiscotecasListView({
                   <Text style={styles.pointIconText}>{point.icon ?? '📍'}</Text>
                 </View>
                 <View style={styles.pointInfo}>
-                  <Text style={styles.pointNombre} numberOfLines={1}>
+                  <Text variant="label" style={styles.pointNombre} numberOfLines={1}>
                     {point.label}
                   </Text>
                   {point.sublabel ? (
-                    <Text style={styles.pointSub} numberOfLines={1}>
+                    <Text variant="bodySmall" style={styles.pointSub} numberOfLines={1}>
                       {point.sublabel}
                     </Text>
                   ) : null}
                 </View>
                 {distancia != null && (
-                  <Text style={styles.pointDist}>{formatDistance(distancia)}</Text>
+                  <Text variant="label" style={styles.pointDist}>{formatDistance(distancia)}</Text>
                 )}
               </TouchableOpacity>
             );
@@ -165,12 +166,9 @@ const styles = StyleSheet.create({
   },
   vacioText: {
     color: colors.textMuted,
-    fontSize: 14,
   },
   sectionTitle: {
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '800',
     letterSpacing: 0.3,
     textTransform: 'uppercase',
     marginTop: 18,
@@ -209,8 +207,6 @@ const styles = StyleSheet.create({
   },
   discoNombre: {
     color: colors.textPrimary,
-    fontSize: 15,
-    fontWeight: '800',
     flexShrink: 1,
   },
   alertDot: {
@@ -222,12 +218,10 @@ const styles = StyleSheet.create({
   },
   discoSub: {
     color: colors.textSecondary,
-    fontSize: 12,
     marginTop: 2,
   },
   discoDireccion: {
     color: colors.textMuted,
-    fontSize: 11.5,
     marginTop: 2,
   },
   pointRow: {
@@ -258,18 +252,13 @@ const styles = StyleSheet.create({
   },
   pointNombre: {
     color: colors.textPrimary,
-    fontSize: 13.5,
-    fontWeight: '700',
   },
   pointSub: {
     color: colors.textMuted,
-    fontSize: 11.5,
     marginTop: 1,
   },
   pointDist: {
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '700',
   },
   distBadge: {
     backgroundColor: colors.backgroundLight,
@@ -285,8 +274,6 @@ const styles = StyleSheet.create({
   },
   distBadgeText: {
     color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
   },
   distBadgeTextOptima: {
     color: colors.neonYellow,

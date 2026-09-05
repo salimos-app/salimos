@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   Linking,
 } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 import { SimpleMapPoint } from './MapView';
 import RoutePanel from './RoutePanel';
@@ -56,21 +56,21 @@ export default function PointCard({
           <Text style={styles.icon}>{point.icon ?? '📍'}</Text>
         </View>
         <View style={styles.headerText}>
-          <Text style={styles.nombre} numberOfLines={2}>
+          <Text variant="heading" style={styles.nombre} numberOfLines={2}>
             {point.label}
           </Text>
           {point.sublabel ? (
-            <Text style={styles.sublabel}>{point.sublabel}</Text>
+            <Text variant="bodySmall" style={styles.sublabel}>{point.sublabel}</Text>
           ) : null}
         </View>
         <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-          <Text style={styles.closeText}>✕</Text>
+          <Text variant="label" style={styles.closeText}>✕</Text>
         </TouchableOpacity>
       </View>
 
       {point.phone && (
         <TouchableOpacity style={styles.callButton} onPress={handleCall}>
-          <Text style={styles.callButtonText}>📞 Llamar: {point.phone}</Text>
+          <Text variant="button" style={styles.callButtonText}>📞 Llamar: {point.phone}</Text>
         </TouchableOpacity>
       )}
 
@@ -125,12 +125,9 @@ const styles = StyleSheet.create({
   },
   nombre: {
     color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: 'bold',
   },
   sublabel: {
     color: colors.textSecondary,
-    fontSize: 13,
     marginTop: 2,
   },
   closeButton: {
@@ -144,8 +141,6 @@ const styles = StyleSheet.create({
   },
   closeText: {
     color: colors.textSecondary,
-    fontSize: 14,
-    fontWeight: 'bold',
   },
   callButton: {
     backgroundColor: colors.neonGreen,
@@ -156,7 +151,5 @@ const styles = StyleSheet.create({
   },
   callButtonText: {
     color: colors.background,
-    fontSize: 15,
-    fontWeight: 'bold',
   },
 });

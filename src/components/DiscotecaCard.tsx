@@ -1,13 +1,13 @@
 import React from 'react';
 import {
   View,
-  Text,
   Image,
   TouchableOpacity,
   ScrollView,
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import Text from './Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients } from '../theme/colors';
 import { Discoteca } from '../types/discoteca';
@@ -70,26 +70,26 @@ export default function DiscotecaCard({
       <ScrollView contentContainerStyle={styles.cardContent} showsVerticalScrollIndicator={false}>
         {nextEvento && (
           <View style={styles.eventoDestacado}>
-            <Text style={styles.eventoDestacadoFecha}>{formatFechaLarga(nextEvento.startDate)}</Text>
-            <Text style={styles.eventoDestacadoNombre} numberOfLines={2}>
+            <Text variant="label" style={styles.eventoDestacadoFecha}>{formatFechaLarga(nextEvento.startDate)}</Text>
+            <Text variant="heading" style={styles.eventoDestacadoNombre} numberOfLines={2}>
               {nextEvento.name}
             </Text>
             <View style={styles.tags}>
               {nextEvento.age != null && (
                 <View style={[styles.tag, { backgroundColor: colors.neonYellow + '1F', borderColor: colors.neonYellow + '55' }]}>
-                  <Text style={[styles.tagText, { color: colors.neonYellow }]}>🔞 +{nextEvento.age}</Text>
+                  <Text variant="caption" style={{ color: colors.neonYellow }}>🔞 +{nextEvento.age}</Text>
                 </View>
               )}
               {eventoExtra?.detalle.dressCode && (
                 <View style={[styles.tag, { backgroundColor: colors.neonBlue + '1F', borderColor: colors.neonBlue + '55' }]}>
-                  <Text style={[styles.tagText, { color: colors.neonBlue }]}>
+                  <Text variant="caption" style={{ color: colors.neonBlue }}>
                     👔 {eventoExtra.detalle.dressCode.charAt(0).toUpperCase() + eventoExtra.detalle.dressCode.slice(1)}
                   </Text>
                 </View>
               )}
               {eventoExtra?.precio != null && (
                 <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
-                  <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {eventoExtra.precio}€</Text>
+                  <Text variant="caption" style={{ color: colors.neonGreen }}>💶 {eventoExtra.precio}€</Text>
                 </View>
               )}
             </View>
@@ -101,33 +101,33 @@ export default function DiscotecaCard({
         <View style={styles.divider} />
 
         <View style={styles.cardHeader}>
-          <Text style={styles.cardNombre}>{discoteca.nombre}</Text>
+          <Text variant="heading" style={styles.cardNombre}>{discoteca.nombre}</Text>
           {discoteca.rating != null && (
             <View style={styles.ratingBadge}>
-              <Text style={styles.ratingText}>⭐ {discoteca.rating.toFixed(1)}</Text>
+              <Text variant="caption" style={styles.ratingText}>⭐ {discoteca.rating.toFixed(1)}</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.direccion}>📍 {discoteca.direccion}</Text>
+        <Text variant="bodySmall" style={styles.direccion}>📍 {discoteca.direccion}</Text>
 
         <View style={styles.tags}>
           <View style={[styles.tag, { backgroundColor: discoteca.color + '22', borderColor: discoteca.color + '55' }]}>
-            <Text style={[styles.tagText, { color: discoteca.color }]}>{discoteca.genero}</Text>
+            <Text variant="caption" style={{ color: discoteca.color }}>{discoteca.genero}</Text>
           </View>
           {discoteca.precioEntrada != null && (
             <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
-              <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {discoteca.precioEntrada}€</Text>
+              <Text variant="caption" style={{ color: colors.neonGreen }}>💶 {discoteca.precioEntrada}€</Text>
             </View>
           )}
           {discoteca.horario && (
             <View style={styles.tag}>
-              <Text style={styles.tagTextMuted}>🕐 {discoteca.horario}</Text>
+              <Text variant="caption" style={styles.tagTextMuted}>🕐 {discoteca.horario}</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.descripcion} numberOfLines={2}>
+        <Text variant="bodySmall" style={styles.descripcion} numberOfLines={2}>
           {discoteca.descripcion}
         </Text>
 
@@ -140,12 +140,12 @@ export default function DiscotecaCard({
         />
 
         <TouchableOpacity onPress={onPlanificarRuta} activeOpacity={0.85} style={styles.rutaButton}>
-          <Text style={styles.rutaButtonText}>🗺️ Planificar ruta (ida y vuelta)</Text>
+          <Text variant="button" style={styles.rutaButtonText}>🗺️ Planificar ruta (ida y vuelta)</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={onVerEventos} activeOpacity={0.85}>
           <LinearGradient colors={gradients.brand} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.eventosButton}>
-            <Text style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>
+            <Text variant="button" style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
@@ -205,13 +205,9 @@ const styles = StyleSheet.create({
   },
   eventoDestacadoFecha: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '600',
   },
   eventoDestacadoNombre: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
     marginTop: 2,
     marginBottom: 12,
     letterSpacing: 0.2,
@@ -224,8 +220,6 @@ const styles = StyleSheet.create({
   },
   cardNombre: {
     color: colors.textPrimary,
-    fontSize: 21,
-    fontWeight: '800',
     flex: 1,
     marginRight: 8,
     letterSpacing: 0.2,
@@ -239,13 +233,10 @@ const styles = StyleSheet.create({
     borderColor: colors.neonYellow + '55',
   },
   ratingText: {
-    fontSize: 12,
-    fontWeight: '700',
     color: colors.neonYellow,
   },
   direccion: {
     color: colors.textSecondary,
-    fontSize: 13.5,
     marginBottom: 14,
   },
   tags: {
@@ -262,19 +253,11 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     backgroundColor: colors.backgroundLight,
   },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   tagTextMuted: {
-    fontSize: 12,
-    fontWeight: '600',
     color: colors.textSecondary,
   },
   descripcion: {
     color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
   },
   divider: {
     height: 1,
@@ -292,8 +275,6 @@ const styles = StyleSheet.create({
   },
   rutaButtonText: {
     color: colors.neonBlue,
-    fontSize: 14,
-    fontWeight: '800',
     letterSpacing: 0.2,
   },
   eventosButton: {
@@ -309,8 +290,6 @@ const styles = StyleSheet.create({
   },
   eventosButtonText: {
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
     letterSpacing: 0.2,
   },
 });

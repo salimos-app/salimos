@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 import { RouteResult, TravelProfile } from '../services/directionsApi';
 import { formatDistance, formatDuration } from '../utils/format';
@@ -41,7 +41,7 @@ export default function RoutePanel({
             onPress={() => onSelectProfile(profile.id)}
             disabled={loading}
           >
-            <Text style={styles.profileButtonText}>
+            <Text variant="caption" style={styles.profileButtonText}>
               {profile.icon} {profile.label}
             </Text>
           </TouchableOpacity>
@@ -49,7 +49,7 @@ export default function RoutePanel({
 
         {route && (
           <TouchableOpacity style={styles.clearButton} onPress={onClear}>
-            <Text style={styles.clearButtonText}>✕ Quitar ruta</Text>
+            <Text variant="caption" style={styles.clearButtonText}>✕ Quitar ruta</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -57,14 +57,14 @@ export default function RoutePanel({
       {loading && (
         <View style={styles.statusRow}>
           <ActivityIndicator size="small" color={colors.neonBlue} />
-          <Text style={styles.statusText}>Calculando ruta...</Text>
+          <Text variant="bodySmall" style={styles.statusText}>Calculando ruta...</Text>
         </View>
       )}
 
-      {error && !loading && <Text style={styles.errorText}>{error}</Text>}
+      {error && !loading && <Text variant="bodySmall" style={styles.errorText}>{error}</Text>}
 
       {route && !loading && !error && (
-        <Text style={styles.summaryText}>
+        <Text variant="label" style={styles.summaryText}>
           🧭 {formatDistance(route.distanceMeters)} ·{' '}
           {formatDuration(route.durationSeconds)}
         </Text>
@@ -92,8 +92,6 @@ const styles = StyleSheet.create({
   },
   profileButtonText: {
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
   },
   clearButton: {
     backgroundColor: colors.error + '22',
@@ -105,8 +103,6 @@ const styles = StyleSheet.create({
   },
   clearButtonText: {
     color: colors.error,
-    fontSize: 12,
-    fontWeight: '600',
   },
   statusRow: {
     flexDirection: 'row',
@@ -116,17 +112,13 @@ const styles = StyleSheet.create({
   },
   statusText: {
     color: colors.textSecondary,
-    fontSize: 12,
   },
   errorText: {
     color: colors.error,
-    fontSize: 12,
     marginTop: 8,
   },
   summaryText: {
     color: colors.neonBlue,
-    fontSize: 13,
-    fontWeight: '700',
     marginTop: 8,
   },
 });

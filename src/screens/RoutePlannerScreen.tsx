@@ -1,12 +1,12 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
 } from 'react-native';
+import Text from '../components/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, gradients } from '../theme/colors';
 import { Discoteca } from '../types/discoteca';
@@ -105,18 +105,18 @@ function OpcionRow({
         <Text style={styles.listaRowIconText}>{icon}</Text>
       </View>
       <View style={styles.listaRowInfo}>
-        <Text style={styles.listaRowNombre} numberOfLines={1}>
+        <Text variant="label" style={styles.listaRowNombre} numberOfLines={1}>
           {nombre}
         </Text>
         {sublabel ? (
-          <Text style={styles.listaRowSub} numberOfLines={1}>
+          <Text variant="bodySmall" style={styles.listaRowSub} numberOfLines={1}>
             {sublabel}
           </Text>
         ) : null}
       </View>
       {distancia != null && (
         <View style={[styles.distBadge, esOptima && styles.distBadgeOptima]}>
-          <Text style={[styles.distBadgeText, esOptima && styles.distBadgeTextOptima]} numberOfLines={1}>
+          <Text variant="caption" style={[styles.distBadgeText, esOptima && styles.distBadgeTextOptima]} numberOfLines={1}>
             {esOptima ? '⭐ ' : ''}
             {formatDistance(distancia)}
           </Text>
@@ -396,8 +396,8 @@ export default function RoutePlannerScreen({
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>Planificar ruta</Text>
-          <Text style={styles.headerSubtitle}>{discoteca.nombre}</Text>
+          <Text variant="caption" style={styles.headerTitle}>Planificar ruta</Text>
+          <Text variant="heading" style={styles.headerSubtitle}>{discoteca.nombre}</Text>
         </View>
       </View>
 
@@ -427,23 +427,23 @@ export default function RoutePlannerScreen({
         />
         {pickingHome && (
           <View style={styles.pickingBanner}>
-            <Text style={styles.pickingBannerText}>👆 Toca el mapa para marcar tu casa</Text>
+            <Text variant="label" style={styles.pickingBannerText}>👆 Toca el mapa para marcar tu casa</Text>
           </View>
         )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={styles.stepLabel}>1. Taxi de ida (opcional)</Text>
+        <Text variant="label" style={styles.stepLabel}>1. Taxi de ida (opcional)</Text>
         <TaxiLista paradasTaxi={paradasTaxi} selected={taxiIda} onSelect={setTaxiIda} referencia={origen} />
 
-        <Text style={styles.stepLabel}>2. Bar, súper o bazar (opcional)</Text>
+        <Text variant="label" style={styles.stepLabel}>2. Bar, súper o bazar (opcional)</Text>
         <View style={styles.chipsWrap}>
           <TouchableOpacity
             style={[styles.chip, !categoriaParada && styles.chipActivo]}
             onPress={() => seleccionarCategoria(null)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, !categoriaParada && styles.chipTextActivo]}>🚫 Sin parada</Text>
+            <Text variant="label" style={[styles.chipText, !categoriaParada && styles.chipTextActivo]}>🚫 Sin parada</Text>
           </TouchableOpacity>
           {CATEGORIAS.map((categoria) => {
             const info = CATEGORIA_INFO[categoria];
@@ -455,7 +455,7 @@ export default function RoutePlannerScreen({
                 onPress={() => seleccionarCategoria(categoria)}
                 activeOpacity={0.8}
               >
-                <Text style={[styles.chipText, activo && { color: info.color }]}>
+                <Text variant="label" style={[styles.chipText, activo && { color: info.color }]}>
                   {info.icon} {info.label}
                 </Text>
               </TouchableOpacity>
@@ -485,17 +485,17 @@ export default function RoutePlannerScreen({
           </View>
         )}
 
-        <Text style={styles.stepLabel}>3. Discoteca</Text>
+        <Text variant="label" style={styles.stepLabel}>3. Discoteca</Text>
         <View style={[styles.fixedCard, { borderLeftColor: discoteca.color }]}>
-          <Text style={styles.fixedCardText}>🪩 {discoteca.nombre}</Text>
+          <Text variant="label" style={styles.fixedCardText}>🪩 {discoteca.nombre}</Text>
         </View>
 
-        <Text style={styles.stepLabel}>4. Taxi de vuelta (opcional)</Text>
+        <Text variant="label" style={styles.stepLabel}>4. Taxi de vuelta (opcional)</Text>
         <TaxiLista paradasTaxi={paradasTaxi} selected={taxiVuelta} onSelect={setTaxiVuelta} referencia={discotecaCoords} />
 
-        <Text style={styles.stepLabel}>5. Casa</Text>
+        <Text variant="label" style={styles.stepLabel}>5. Casa</Text>
         <View style={styles.fixedCard}>
-          <Text style={styles.fixedCardText}>
+          <Text variant="label" style={styles.fixedCardText}>
             {casa ? '🏠 Ubicación elegida en el mapa' : '🏠 Tu ubicación de salida (por defecto)'}
           </Text>
         </View>
@@ -505,7 +505,7 @@ export default function RoutePlannerScreen({
             onPress={() => setPickingHome((prev) => !prev)}
             activeOpacity={0.8}
           >
-            <Text style={[styles.chipText, pickingHome && styles.chipTextActivo]}>
+            <Text variant="label" style={[styles.chipText, pickingHome && styles.chipTextActivo]}>
               {pickingHome ? '✕ Cancelar selección' : '📍 Elegir en el mapa'}
             </Text>
           </TouchableOpacity>
@@ -518,7 +518,7 @@ export default function RoutePlannerScreen({
               }}
               activeOpacity={0.8}
             >
-              <Text style={styles.chipText}>↺ Usar ubicación de salida</Text>
+              <Text variant="label" style={styles.chipText}>↺ Usar ubicación de salida</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -533,30 +533,30 @@ export default function RoutePlannerScreen({
             {calculando ? (
               <ActivityIndicator size="small" color="#ffffff" />
             ) : (
-              <Text style={styles.calcularButtonText}>🧭 Calcular ruta completa</Text>
+              <Text variant="button" style={styles.calcularButtonText}>🧭 Calcular ruta completa</Text>
             )}
           </LinearGradient>
         </TouchableOpacity>
 
-        {(locationError || error) && <Text style={styles.errorText}>{locationError ?? error}</Text>}
+        {(locationError || error) && <Text variant="body" style={styles.errorText}>{locationError ?? error}</Text>}
 
         {tramos.length > 0 && !calculando && (
           <View style={styles.resultados}>
             <View style={styles.resultadosHeader}>
-              <Text style={styles.resultadosTotal}>
+              <Text variant="label" style={styles.resultadosTotal}>
                 🧭 {formatDistance(totalDistancia)} · {formatDuration(totalDuracion)} en total
               </Text>
               <TouchableOpacity onPress={handleReiniciar}>
-                <Text style={styles.reiniciarText}>Reiniciar</Text>
+                <Text variant="label" style={styles.reiniciarText}>Reiniciar</Text>
               </TouchableOpacity>
             </View>
 
             {tramos.map((tramo, index) => (
               <View key={index} style={styles.tramoRow}>
-                <Text style={styles.tramoLabel} numberOfLines={1}>
+                <Text variant="label" style={styles.tramoLabel} numberOfLines={1}>
                   {tramo.desde.icon} {tramo.desde.label} → {tramo.hasta.icon} {tramo.hasta.label}
                 </Text>
-                <Text style={styles.tramoDetalle}>
+                <Text variant="bodySmall" style={styles.tramoDetalle}>
                   {tramo.profile === 'driving-car' ? '🚗' : '🚶'} {formatDistance(tramo.distanceMeters)} ·{' '}
                   {formatDuration(tramo.durationSeconds)}
                 </Text>
@@ -604,15 +604,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   headerSubtitle: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
     marginTop: 2,
     letterSpacing: 0.2,
   },
@@ -636,8 +632,6 @@ const styles = StyleSheet.create({
   },
   pickingBannerText: {
     color: colors.neonBlue,
-    fontSize: 13,
-    fontWeight: '700',
   },
   content: {
     padding: 16,
@@ -645,8 +639,6 @@ const styles = StyleSheet.create({
   },
   stepLabel: {
     color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '700',
     marginTop: 18,
     marginBottom: 10,
   },
@@ -696,12 +688,9 @@ const styles = StyleSheet.create({
   },
   listaRowNombre: {
     color: colors.textPrimary,
-    fontSize: 13.5,
-    fontWeight: '700',
   },
   listaRowSub: {
     color: colors.textMuted,
-    fontSize: 11.5,
     marginTop: 1,
   },
   distBadge: {
@@ -718,8 +707,6 @@ const styles = StyleSheet.create({
   },
   distBadgeText: {
     color: colors.textSecondary,
-    fontSize: 11,
-    fontWeight: '700',
   },
   distBadgeTextOptima: {
     color: colors.neonYellow,
@@ -739,8 +726,6 @@ const styles = StyleSheet.create({
   },
   chipText: {
     color: colors.textSecondary,
-    fontSize: 12.5,
-    fontWeight: '700',
   },
   chipTextActivo: {
     color: colors.neonBlue,
@@ -757,8 +742,6 @@ const styles = StyleSheet.create({
   },
   fixedCardText: {
     color: colors.textPrimary,
-    fontSize: 14,
-    fontWeight: '700',
   },
   calcularWrap: {
     marginTop: 22,
@@ -775,13 +758,10 @@ const styles = StyleSheet.create({
   },
   calcularButtonText: {
     color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
     letterSpacing: 0.2,
   },
   errorText: {
     color: colors.error,
-    fontSize: 13,
     marginTop: 12,
     textAlign: 'center',
   },
@@ -801,13 +781,9 @@ const styles = StyleSheet.create({
   },
   resultadosTotal: {
     color: colors.neonBlue,
-    fontSize: 14,
-    fontWeight: '800',
   },
   reiniciarText: {
     color: colors.textMuted,
-    fontSize: 12.5,
-    fontWeight: '700',
   },
   tramoRow: {
     paddingVertical: 8,
@@ -816,12 +792,9 @@ const styles = StyleSheet.create({
   },
   tramoLabel: {
     color: colors.textPrimary,
-    fontSize: 13.5,
-    fontWeight: '700',
   },
   tramoDetalle: {
     color: colors.textSecondary,
-    fontSize: 12,
     marginTop: 3,
   },
 });

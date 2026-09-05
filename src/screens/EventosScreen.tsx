@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
-  Text,
   FlatList,
   ScrollView,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
   ActivityIndicator,
   Image,
 } from 'react-native';
+import Text from '../components/Text';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Discoteca } from '../types/discoteca';
 import { Evento } from '../types/evento';
@@ -134,17 +134,17 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
         ) : null}
 
         <View style={styles.fechaBox}>
-          <Text style={styles.fechaDia}>{fecha.dia}</Text>
-          <Text style={styles.fechaMes}>{fecha.mes}</Text>
-          <Text style={styles.fechaDiaSemana}>{fecha.diaSemana}</Text>
+          <Text variant="display" style={styles.fechaDia}>{fecha.dia}</Text>
+          <Text variant="label" style={styles.fechaMes}>{fecha.mes}</Text>
+          <Text variant="bodySmall" style={styles.fechaDiaSemana}>{fecha.diaSemana}</Text>
         </View>
 
         <View style={styles.eventoInfo}>
-          <Text style={styles.eventoNombre}>{item.name}</Text>
+          <Text variant="subheading" style={styles.eventoNombre}>{item.name}</Text>
           <View style={styles.eventoDetalle}>
-            <Text style={styles.eventoHora}>🕐 {formatHora(item.startDate)}</Text>
-            <Text style={styles.eventoUbicacion}>📍 {item.location.name}</Text>
-            {precio != null && <Text style={styles.eventoPrecio}>💶 Desde {precio}€</Text>}
+            <Text variant="bodySmall" style={styles.eventoHora}>🕐 {formatHora(item.startDate)}</Text>
+            <Text variant="bodySmall" style={styles.eventoUbicacion}>📍 {item.location.name}</Text>
+            {precio != null && <Text variant="label" style={styles.eventoPrecio}>💶 Desde {precio}€</Text>}
           </View>
         </View>
       </View>
@@ -158,19 +158,19 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
           <Text style={styles.backText}>←</Text>
         </TouchableOpacity>
         <View style={styles.headerInfo}>
-          <Text style={styles.headerTitle}>Próximos eventos</Text>
-          <Text style={styles.headerSubtitle}>{discoteca.nombre}</Text>
+          <Text variant="caption" style={styles.headerTitle}>Próximos eventos</Text>
+          <Text variant="heading" style={styles.headerSubtitle}>{discoteca.nombre}</Text>
         </View>
       </View>
 
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.neonPink} />
-          <Text style={styles.loadingText}>Cargando eventos...</Text>
+          <Text variant="bodySmall" style={styles.loadingText}>Cargando eventos...</Text>
         </View>
       ) : error ? (
         <View style={styles.centerContainer}>
-          <Text style={styles.errorText}>{error}</Text>
+          <Text variant="body" style={styles.errorText}>{error}</Text>
           <TouchableOpacity onPress={loadEventos} activeOpacity={0.85}>
             <LinearGradient
               colors={gradients.brandSoft}
@@ -178,7 +178,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
               end={{ x: 1, y: 0 }}
               style={styles.retryButton}
             >
-              <Text style={styles.retryText}>Reintentar</Text>
+              <Text variant="button" style={styles.retryText}>Reintentar</Text>
             </LinearGradient>
           </TouchableOpacity>
         </View>
@@ -216,6 +216,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
                       </>
                     ) : null}
                     <Text
+                      variant="caption"
                       style={[
                         styles.diaChipLabel,
                         !image && activo && styles.diaChipLabelActivo,
@@ -224,7 +225,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
                     >
                       {esHoy ? 'Hoy' : weekdayShort(date)}
                     </Text>
-                    <Text style={styles.diaChipNumero}>{date.getDate().toString().padStart(2, '0')}</Text>
+                    <Text variant="heading" style={styles.diaChipNumero}>{date.getDate().toString().padStart(2, '0')}</Text>
                   </TouchableOpacity>
                 );
               })}
@@ -244,7 +245,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
                     <Image source={{ uri: eventoDestacado.image }} style={styles.heroImagen} resizeMode="cover" />
                   ) : (
                     <View style={styles.heroImagenPlaceholder}>
-                      <Text style={styles.heroImagenPlaceholderText}>
+                      <Text variant="heading" style={styles.heroImagenPlaceholderText}>
                         {eventoDestacado.name.charAt(0).toUpperCase()}
                       </Text>
                     </View>
@@ -255,12 +256,12 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
                     pointerEvents="none"
                   />
                   <View style={styles.heroInfo}>
-                    <Text style={styles.heroNombre}>{eventoDestacado.name}</Text>
+                    <Text variant="heading" style={styles.heroNombre}>{eventoDestacado.name}</Text>
                     <View style={styles.heroDetalle}>
-                      <Text style={styles.heroHora}>🕐 {formatHora(eventoDestacado.startDate)}</Text>
-                      <Text style={styles.heroUbicacion}>📍 {eventoDestacado.location.name}</Text>
+                      <Text variant="label" style={styles.heroHora}>🕐 {formatHora(eventoDestacado.startDate)}</Text>
+                      <Text variant="label" style={styles.heroUbicacion}>📍 {eventoDestacado.location.name}</Text>
                       {eventoDestacado.id && preciosPorId[eventoDestacado.id] != null && (
-                        <Text style={styles.heroPrecio}>💶 Desde {preciosPorId[eventoDestacado.id]}€</Text>
+                        <Text variant="label" style={styles.heroPrecio}>💶 Desde {preciosPorId[eventoDestacado.id]}€</Text>
                       )}
                     </View>
                   </View>
@@ -270,7 +271,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
             ListEmptyComponent={
               eventoDestacado ? null : (
                 <View style={styles.centerContainer}>
-                  <Text style={styles.emptyText}>No hay próximos eventos</Text>
+                  <Text variant="body" style={styles.emptyText}>No hay próximos eventos</Text>
                 </View>
               )
             }
@@ -316,15 +317,11 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     color: colors.textMuted,
-    fontSize: 12,
-    fontWeight: '700',
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
   headerSubtitle: {
     color: colors.textPrimary,
-    fontSize: 20,
-    fontWeight: '800',
     marginTop: 2,
     letterSpacing: 0.2,
   },
@@ -336,12 +333,10 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     color: colors.textSecondary,
-    fontSize: 14,
     marginTop: 12,
   },
   errorText: {
     color: colors.error,
-    fontSize: 15,
     textAlign: 'center',
     marginBottom: 16,
   },
@@ -352,12 +347,9 @@ const styles = StyleSheet.create({
   },
   retryText: {
     color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '800',
   },
   emptyText: {
     color: colors.textMuted,
-    fontSize: 16,
   },
   diasContainer: {
     backgroundColor: colors.backgroundCard,
@@ -395,8 +387,6 @@ const styles = StyleSheet.create({
   },
   diaChipLabel: {
     color: colors.textMuted,
-    fontSize: 11,
-    fontWeight: '700',
     textTransform: 'uppercase',
   },
   diaChipLabelActivo: {
@@ -410,7 +400,6 @@ const styles = StyleSheet.create({
   diaChipNumero: {
     color: colors.textPrimary,
     fontSize: 16,
-    fontWeight: '800',
     marginTop: 2,
   },
   listContent: {
@@ -445,7 +434,6 @@ const styles = StyleSheet.create({
   heroImagenPlaceholderText: {
     color: colors.textMuted,
     fontSize: 64,
-    fontWeight: '800',
   },
   heroFade: {
     position: 'absolute',
@@ -463,8 +451,6 @@ const styles = StyleSheet.create({
   },
   heroNombre: {
     color: '#ffffff',
-    fontSize: 21,
-    fontWeight: '800',
     marginBottom: 8,
     letterSpacing: 0.2,
   },
@@ -475,18 +461,12 @@ const styles = StyleSheet.create({
   },
   heroHora: {
     color: 'rgba(255,255,255,0.88)',
-    fontSize: 13,
-    fontWeight: '700',
   },
   heroUbicacion: {
     color: 'rgba(255,255,255,0.88)',
-    fontSize: 13,
-    fontWeight: '700',
   },
   heroPrecio: {
     color: colors.brandPink,
-    fontSize: 13,
-    fontWeight: '800',
   },
   eventoCard: {
     flexDirection: 'row',
@@ -522,18 +502,13 @@ const styles = StyleSheet.create({
   },
   fechaDia: {
     color: colors.brandPink,
-    fontSize: 24,
-    fontWeight: '800',
   },
   fechaMes: {
     color: colors.textPrimary,
-    fontSize: 12,
-    fontWeight: '600',
     textTransform: 'uppercase',
   },
   fechaDiaSemana: {
     color: colors.textMuted,
-    fontSize: 11,
     marginTop: 2,
   },
   eventoInfo: {
@@ -542,8 +517,6 @@ const styles = StyleSheet.create({
   },
   eventoNombre: {
     color: colors.textPrimary,
-    fontSize: 16,
-    fontWeight: 'bold',
     marginBottom: 6,
   },
   eventoDetalle: {
@@ -553,15 +526,11 @@ const styles = StyleSheet.create({
   },
   eventoHora: {
     color: colors.textSecondary,
-    fontSize: 13,
   },
   eventoUbicacion: {
     color: colors.textSecondary,
-    fontSize: 13,
   },
   eventoPrecio: {
     color: colors.brandPink,
-    fontSize: 13,
-    fontWeight: '700',
   },
 });

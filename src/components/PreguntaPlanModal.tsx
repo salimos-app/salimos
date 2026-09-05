@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, TouchableOpacity, StyleSheet } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 
 interface Props {
@@ -17,15 +18,15 @@ export default function PreguntaPlanModal({ onElegir, onCancelar }: Props) {
   return (
     <View style={styles.overlay}>
       <View style={styles.card}>
-        <Text style={styles.titulo}>¿Cómo empiezas la noche?</Text>
+        <Text variant="heading" style={styles.titulo}>¿Cómo empiezas la noche?</Text>
         <TouchableOpacity style={styles.opcion} onPress={() => onElegir('casa')} activeOpacity={0.85}>
-          <Text style={styles.opcionText}>🍾 Botellona en casa</Text>
+          <Text variant="body" style={styles.opcionText}>🍾 Botellona en casa</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.opcion} onPress={() => onElegir('bar')} activeOpacity={0.85}>
-          <Text style={styles.opcionText}>🍹 Tomar algo fuera</Text>
+          <Text variant="body" style={styles.opcionText}>🍹 Tomar algo fuera</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={onCancelar} style={styles.cancelar}>
-          <Text style={styles.cancelarText}>Cancelar</Text>
+          <Text variant="subheading" style={styles.cancelarText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -59,8 +60,6 @@ const styles = StyleSheet.create({
   },
   titulo: {
     color: colors.textPrimary,
-    fontSize: 17,
-    fontWeight: '800',
     marginBottom: 16,
     textAlign: 'center',
   },
@@ -75,8 +74,6 @@ const styles = StyleSheet.create({
   },
   opcionText: {
     color: colors.textPrimary,
-    fontSize: 14.5,
-    fontWeight: '800',
   },
   cancelar: {
     alignItems: 'center',
@@ -84,7 +81,5 @@ const styles = StyleSheet.create({
   },
   cancelarText: {
     color: colors.textMuted,
-    fontSize: 13,
-    fontWeight: '700',
   },
 });

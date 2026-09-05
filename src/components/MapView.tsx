@@ -2,6 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, BRAND_GRADIENT } from '../theme/colors';
+import {
+  MAP_FONT_FAMILY,
+  MAP_FONT_STYLESHEET_URL,
+  PIN_ACCENT_FONT_WEIGHT,
+  PIN_FILL_ALPHA,
+  PIN_ICON_COLOR,
+  PIN_ICON_DROP_SHADOW,
+  PIN_LABEL_FONT_WEIGHT,
+} from '../theme/mapPins';
+import { PIN_ICON_PATHS, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
 import { mapStyle, MarkerProps, MapViewProps } from './MapView.types';
 
 function toJsonForScript(value: unknown): string {
@@ -46,6 +56,7 @@ function buildMapHtml({
   return `<!doctype html>
 <html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.css">
+<link rel="stylesheet" href="${MAP_FONT_STYLESHEET_URL}">
 <style>
 html,body,#map{height:100%;margin:0;background:${colors.background}}
 .simple-point{width:30px;height:30px;border-radius:50%;border:2.5px solid ${colors.background};box-shadow:0 0 0 1.5px rgba(255,255,255,.55),0 6px 14px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:14px}
@@ -55,12 +66,13 @@ html,body,#map{height:100%;margin:0;background:${colors.background}}
 <body><div id="map"></div><script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script><script>
 const mapStyle=${toJsonForScript(mapStyle)};
 const gradientStops=${toJsonForScript(gradientStops)};
+const pinIconPaths=${toJsonForScript(PIN_ICON_PATHS)};
 const EVENT_PIN_WIDTH=100;
 const EVENT_PIN_POINTER_HEIGHT=10;
 function pinNameLabelHtml(item){
   const sel=!!item.selected;
   return '<div style="max-width:132px;background:${colors.backgroundCard}F5;border:1px solid '+(sel?item.color:'${colors.borderLight}')+';border-radius:8px;padding:3px 8px;margin-bottom:3px;box-shadow:0 4px 10px rgba(0,0,0,.4)'+(sel?', 0 0 0 3px '+item.color+'40':'')+';">'
-    +'<span style="display:block;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:-apple-system,system-ui,sans-serif;">'+item.title+'</span></div>';
+    +'<span style="display:block;color:#fff;font-size:10.5px;font-weight:${PIN_LABEL_FONT_WEIGHT};letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:${MAP_FONT_FAMILY};">'+item.title+'</span></div>';
 }
 // El div raíz que devuelve esta función es el que MapLibre posiciona
 // directamente (le reescribe el transform en cada frame para seguir el
@@ -84,18 +96,23 @@ function discotecaPinHtml(item){
   const html='<div style="width:140px;"><div style="display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.1:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
     +pinNameLabelHtml(item)
     +'<div style="position:relative;width:36px;height:42px;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));">'
-    +'<svg width="36" height="42" viewBox="0 0 36 42"><path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z" fill="'+item.color+'" stroke="'+(sel?'#ffffff':'${colors.background}')+'" stroke-width="'+(sel?2.5:1.5)+'"/></svg>'
-    +'<div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-weight:800;font-size:14px;font-family:-apple-system,system-ui,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.45);">'+initial+'</div>'
+    +'<svg width="36" height="42" viewBox="0 0 36 42"><path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z" fill="'+item.color+'${PIN_FILL_ALPHA}" stroke="'+(sel?'#ffffff':'${colors.background}')+'" stroke-width="'+(sel?2.5:1.5)+'"/></svg>'
+    +'<div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-weight:${PIN_ACCENT_FONT_WEIGHT};font-size:14px;font-family:${MAP_FONT_FAMILY};text-shadow:0 1px 3px rgba(0,0,0,.45);">'+initial+'</div>'
     +alertBadge+'</div></div></div>';
   return html;
 }
 function clusterHtml(count){
   const size=count<10?36:count<25?44:52;
   const fontSize=count<10?12:count<25?13.5:15;
-  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:${colors.backgroundCard}F2;border:2.5px solid ${colors.brandPink};box-shadow:0 0 0 4px ${colors.brandPink}26,0 8px 18px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:'+fontSize+'px;font-family:-apple-system,system-ui,sans-serif;">'+count+'</div>';
+  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:${colors.backgroundCard}F2;border:2.5px solid ${colors.brandPink};box-shadow:0 0 0 4px ${colors.brandPink}26,0 8px 18px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:${PIN_ACCENT_FONT_WEIGHT};font-size:'+fontSize+'px;font-family:${MAP_FONT_FAMILY};">'+count+'</div>';
 }
-function simplePointHtml(icon,color){
-  return '<div class="simple-point" style="background:'+(color||'${colors.backgroundCard}')+'">'+(icon||'📍')+'</div>';
+function simplePointIcon(kind,fallbackEmoji){
+  const path=kind?pinIconPaths[kind]:undefined;
+  if(!path)return fallbackEmoji||'📍';
+  return '<svg width="16" height="16" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="'+path+'"/></svg>';
+}
+function simplePointHtml(kind,icon,color){
+  return '<div class="simple-point" style="background:'+((color||'${colors.backgroundCard}')+'${PIN_FILL_ALPHA}')+'">'+simplePointIcon(kind,icon)+'</div>';
 }
 
 const map=new maplibregl.Map({container:'map',style:mapStyle,center:[${center.longitude},${center.latitude}],zoom:13});
@@ -172,7 +189,7 @@ map.on('load',()=>{
       const point=pointsById.get(id);
       if(!point)return;
       const el=document.createElement('div');
-      el.innerHTML=simplePointHtml(point.icon,point.color);
+      el.innerHTML=simplePointHtml(point.kind,point.icon,point.color);
       const markerEl=el.firstElementChild;
       markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:point.id}));});
       const marker=new maplibregl.Marker({element:markerEl}).setLngLat([point.longitude,point.latitude]).addTo(map);

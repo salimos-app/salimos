@@ -1,6 +1,30 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import * as maplibregl from 'maplibre-gl';
+import type {
+  Feature,
+  FeatureCollection,
+  Point as GeoJSONPoint,
+} from 'geojson';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { Discoteca } from '../types/discoteca';
+import { colors, BRAND_GRADIENT } from '../theme/colors';
+import {
+  MAP_FONT_FAMILY,
+  MAP_FONT_STYLESHEET_URL,
+  PIN_ACCENT_FONT_WEIGHT,
+  PIN_FILL_ALPHA,
+  PIN_ICON_COLOR,
+  PIN_ICON_DROP_SHADOW,
+  PIN_LABEL_FONT_WEIGHT,
+} from '../theme/mapPins';
+import { PIN_ICON_PATHS, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
+import {
+  MarkerProps,
+  MapViewProps,
+  SimpleMapPoint,
+  mapStyle,
+} from './MapView.types';
 
 // MapLibre intenta detectar la URL de su propio <script> para relanzarse a sí
 // mismo como worker; bajo Metro (el bundler de Expo web) todo el código de la
@@ -15,20 +39,17 @@ import * as maplibregl from 'maplibre-gl';
 // (`public/maplibre-gl-csp-worker.js`) — hay que mantenerla sincronizada si
 // se actualiza la versión de `maplibre-gl`.
 maplibregl.setWorkerUrl('/maplibre-gl-csp-worker.js');
-import type {
-  Feature,
-  FeatureCollection,
-  Point as GeoJSONPoint,
-} from 'geojson';
-import 'maplibre-gl/dist/maplibre-gl.css';
-import { Discoteca } from '../types/discoteca';
-import { colors, BRAND_GRADIENT } from '../theme/colors';
-import {
-  MarkerProps,
-  MapViewProps,
-  SimpleMapPoint,
-  mapStyle,
-} from './MapView.types';
+
+// Los pines son DOM plano fuera del árbol de React Native (MapLibre los
+// posiciona a mano), así que no heredan las fuentes que registra
+// `expo-font` para el resto de la app: se cargan una única vez, aparte.
+if (typeof document !== 'undefined' && !document.getElementById('salimos-map-font')) {
+  const link = document.createElement('link');
+  link.id = 'salimos-map-font';
+  link.rel = 'stylesheet';
+  link.href = MAP_FONT_STYLESHEET_URL;
+  document.head.appendChild(link);
+}
 
 const DEFAULT_DISCOTECA_IMAGE =
   'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400';
@@ -68,13 +89,13 @@ function pinNameLabel(discoteca: Discoteca, selected: boolean) {
         display: block;
         color: #ffffff;
         font-size: 10.5px;
-        font-weight: 800;
+        font-weight: ${PIN_LABEL_FONT_WEIGHT};
         letter-spacing: 0.4px;
         text-transform: uppercase;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
-        font-family: -apple-system, system-ui, sans-serif;
+        font-family: ${MAP_FONT_FAMILY};
       ">${discoteca.nombre}</span>
     </div>
   `;
@@ -138,9 +159,9 @@ function discotecaMarkerHtml(
         <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
           <svg width="36" height="42" viewBox="0 0 36 42">
             <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
-              fill="${discoteca.color}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
+              fill="${discoteca.color}${PIN_FILL_ALPHA}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
           </svg>
-          <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:800; font-size:14px; font-family:-apple-system, system-ui, sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
+          <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:${PIN_ACCENT_FONT_WEIGHT}; font-size:14px; font-family:${MAP_FONT_FAMILY}; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
           ${hasAlerts ? ALERT_BADGE_HTML : ''}
         </div>
       </div>
@@ -163,19 +184,26 @@ function clusterMarkerHtml(count: number) {
     align-items: center;
     justify-content: center;
     color: #ffffff;
-    font-weight: 800;
+    font-weight: ${PIN_ACCENT_FONT_WEIGHT};
     font-size: ${fontSize}px;
-    font-family: -apple-system, system-ui, sans-serif;
+    font-family: ${MAP_FONT_FAMILY};
     cursor: pointer;
   ">${count}</div>`;
 }
 
-function simplePointHtml(icon: string, color?: string) {
+/** Ícono del pin: SVG de Material Symbols por categoría (`kind`); si no hay una conocida, cae al emoji. */
+function simplePointIcon(kind: string | undefined, fallbackEmoji: string) {
+  const path = kind ? PIN_ICON_PATHS[kind] : undefined;
+  if (!path) return fallbackEmoji;
+  return `<svg width="16" height="16" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${path}"/></svg>`;
+}
+
+function simplePointHtml(kind: string | undefined, icon: string, color?: string) {
   return `<div style="
     width: 30px;
     height: 30px;
     border-radius: 50%;
-    background: ${color ?? colors.backgroundCard};
+    background: ${(color ?? colors.backgroundCard) + PIN_FILL_ALPHA};
     border: 2.5px solid ${colors.background};
     box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 6px 14px rgba(0,0,0,.45);
     display: flex;
@@ -183,7 +211,7 @@ function simplePointHtml(icon: string, color?: string) {
     justify-content: center;
     font-size: 14px;
     cursor: pointer;
-  ">${icon}</div>`;
+  ">${simplePointIcon(kind, icon)}</div>`;
 }
 
 const POINTS_SOURCE_ID = 'salimos-points';
@@ -240,7 +268,7 @@ function usePointsClusterLayer(
         const point = pointsById.get(id);
         if (!point) return;
         const el = document.createElement('div');
-        el.innerHTML = simplePointHtml(point.icon ?? '📍', point.color);
+        el.innerHTML = simplePointHtml(point.kind, point.icon ?? '📍', point.color);
         const marker = new maplibregl.Marker({
           element: el.firstElementChild as HTMLElement,
         })

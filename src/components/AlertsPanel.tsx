@@ -1,11 +1,11 @@
 import React from 'react';
 import {
   View,
-  Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
 } from 'react-native';
+import Text from './Text';
 import { colors } from '../theme/colors';
 import {
   useAlertCatalog,
@@ -40,7 +40,7 @@ export default function AlertsPanel({ slug }: Props) {
             if (!type) return null;
             return (
               <View key={alert.id} style={styles.badge}>
-                <Text style={styles.badgeText}>
+                <Text variant="caption" style={styles.badgeText}>
                   {type.icon} {type.label}
                   {alert.value != null ? ` ${alert.value}+` : ''} ·{' '}
                   {alert.count} · {timeAgo(alert.lastReportedAt)}
@@ -64,7 +64,7 @@ export default function AlertsPanel({ slug }: Props) {
                 style={styles.reportButton}
                 onPress={() => report(type.id, value)}
               >
-                <Text style={styles.reportButtonText}>
+                <Text variant="caption" style={styles.reportButtonText}>
                   {type.icon} {value}+
                 </Text>
               </TouchableOpacity>
@@ -75,7 +75,7 @@ export default function AlertsPanel({ slug }: Props) {
               style={styles.reportButton}
               onPress={() => report(type.id)}
             >
-              <Text style={styles.reportButtonText}>
+              <Text variant="caption" style={styles.reportButtonText}>
                 {type.icon} {type.label}
               </Text>
             </TouchableOpacity>
@@ -106,8 +106,6 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: colors.textPrimary,
-    fontSize: 11,
-    fontWeight: '600',
   },
   reportRow: {
     gap: 8,
@@ -123,7 +121,5 @@ const styles = StyleSheet.create({
   },
   reportButtonText: {
     color: colors.textSecondary,
-    fontSize: 12,
-    fontWeight: '600',
   },
 });
