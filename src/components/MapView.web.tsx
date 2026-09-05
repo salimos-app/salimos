@@ -84,6 +84,15 @@ function pinNameLabel(discoteca: Discoteca, selected: boolean) {
  * Pin de discoteca: si hay foto del evento del día, esa foto ES el pin (a su
  * forma natural, sin recortar ni redondear); si no, cae al diseño anterior
  * (inicial sobre el color de marca).
+ *
+ * El nodo raíz que devuelve esta función es el que se le pasa a
+ * `maplibregl.Marker({element})`, y MapLibre reescribe su `transform` en
+ * cada frame para seguir el mapa (`translate(...)`) — si ese mismo nodo
+ * tuviera además una `transition: transform` propia (para el efecto de
+ * "seleccionado"), el navegador intentaría animar también esos cambios de
+ * posición, y el pin se quedaría a medio camino del mapa mientras arrastras
+ * ("pilluqui"). Por eso el escalado va en un `<div>` interior aparte, nunca
+ * en el nodo que MapLibre posiciona.
  */
 function discotecaMarkerHtml(
   discoteca: Discoteca,
@@ -95,25 +104,27 @@ function discotecaMarkerHtml(
     const width = EVENT_PIN_IMAGE_SIZE;
     const pointer = EVENT_PIN_POINTER_HEIGHT;
     return `
-      <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.06 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
-        ${pinNameLabel(discoteca, selected)}
-        <div style="position: relative; width: ${width}px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));">
-          <img src="${eventImage}" style="
-            display: block;
-            width: ${width}px;
-            height: auto;
-            border: 3px solid ${selected ? '#ffffff' : discoteca.color};
-            box-sizing: border-box;
-          " />
-          <div style="
-            width: 0;
-            height: 0;
-            margin: 0 auto;
-            border-left: 8px solid transparent;
-            border-right: 8px solid transparent;
-            border-top: ${pointer}px solid ${discoteca.color};
-          "></div>
-          ${hasAlerts ? ALERT_BADGE_HTML : ''}
+      <div style="width:140px;">
+        <div style="display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.06 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
+          ${pinNameLabel(discoteca, selected)}
+          <div style="position: relative; width: ${width}px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));">
+            <img src="${eventImage}" style="
+              display: block;
+              width: ${width}px;
+              height: auto;
+              border: 3px solid ${selected ? '#ffffff' : discoteca.color};
+              box-sizing: border-box;
+            " />
+            <div style="
+              width: 0;
+              height: 0;
+              margin: 0 auto;
+              border-left: 8px solid transparent;
+              border-right: 8px solid transparent;
+              border-top: ${pointer}px solid ${discoteca.color};
+            "></div>
+            ${hasAlerts ? ALERT_BADGE_HTML : ''}
+          </div>
         </div>
       </div>
     `;
@@ -121,15 +132,17 @@ function discotecaMarkerHtml(
 
   const initial = (discoteca.nombre || '?').charAt(0).toUpperCase();
   return `
-    <div style="width:140px; display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
-      ${pinNameLabel(discoteca, selected)}
-      <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
-        <svg width="36" height="42" viewBox="0 0 36 42">
-          <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
-            fill="${discoteca.color}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
-        </svg>
-        <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:800; font-size:14px; font-family:-apple-system, system-ui, sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
-        ${hasAlerts ? ALERT_BADGE_HTML : ''}
+    <div style="width:140px;">
+      <div style="display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
+        ${pinNameLabel(discoteca, selected)}
+        <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
+          <svg width="36" height="42" viewBox="0 0 36 42">
+            <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
+              fill="${discoteca.color}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
+          </svg>
+          <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:800; font-size:14px; font-family:-apple-system, system-ui, sans-serif; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
+          ${hasAlerts ? ALERT_BADGE_HTML : ''}
+        </div>
       </div>
     </div>
   `;
@@ -182,7 +195,7 @@ function usePointsClusterLayer(
   points: SimpleMapPoint[],
   onPointPress?: (point: SimpleMapPoint) => void,
 ) {
-  const markersRef = React.useRef<maplibregl.Marker[]>([]);
+  const markersRef = React.useRef<Map<string, maplibregl.Marker>>(new Map());
   const onPointPressRef = React.useRef(onPointPress);
   onPointPressRef.current = onPointPress;
 
@@ -202,13 +215,18 @@ function usePointsClusterLayer(
       })),
     };
 
+    const pointsById = new Map(points.map((point) => [point.id, point]));
+
     function clearIndividualMarkers() {
       markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current = [];
+      markersRef.current.clear();
     }
 
+    // Diferencial (igual que los clusters): solo se crean los pines que
+    // aparecen y se quitan los que dejan de estar. Recrearlos todos aquí
+    // hacía que arrastrar el mapa destruyera y reconstruyera el DOM de cada
+    // pin en cada frame del gesto, y se veía a tirones.
     function renderIndividualMarkers() {
-      clearIndividualMarkers();
       if (!m.getSource(POINTS_SOURCE_ID)) return;
       const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
         filter: ['!', ['has', 'point_count']],
@@ -218,7 +236,8 @@ function usePointsClusterLayer(
         const id = feature.properties?.id as string | undefined;
         if (!id || seen.has(id)) return;
         seen.add(id);
-        const point = points.find((p) => p.id === id);
+        if (markersRef.current.has(id)) return;
+        const point = pointsById.get(id);
         if (!point) return;
         const el = document.createElement('div');
         el.innerHTML = simplePointHtml(point.icon ?? '📍', point.color);
@@ -231,7 +250,13 @@ function usePointsClusterLayer(
           event.stopPropagation();
           onPointPressRef.current?.(point);
         });
-        markersRef.current.push(marker);
+        markersRef.current.set(id, marker);
+      });
+      markersRef.current.forEach((marker, id) => {
+        if (!seen.has(id)) {
+          marker.remove();
+          markersRef.current.delete(id);
+        }
       });
     }
 
@@ -444,6 +469,9 @@ export function MapViewComponent({
   const center = region || initialRegion;
   const onPressRef = React.useRef(onPress);
   onPressRef.current = onPress;
+  const discotecaMarkersRef = React.useRef<
+    Map<string, { marker: maplibregl.Marker; firma: string }>
+  >(new Map());
 
   const markers = React.Children.toArray(children).filter((child) => {
     if (!React.isValidElement(child)) return false;
@@ -454,25 +482,46 @@ export function MapViewComponent({
     );
   }) as React.ReactElement<MarkerProps>[];
 
-  // Clave serializable de los datos de cada marcador (sin `children`/`onPress`,
+  /** Id estable de un marcador, para poder actualizarlos uno a uno. */
+  function markerId(marker: React.ReactElement<MarkerProps>, index: number) {
+    return marker.props.discoteca?.slug ?? marker.props.title ?? String(index);
+  }
+
+  // Firma serializable de lo que se ve de cada marcador (sin `children`/`onPress`,
   // que no son serializables y con `children` en concreto rompían el
   // `JSON.stringify` al incluir un elemento React con referencias circulares).
-  const markersKey = markers
-    .map((marker) => {
+  // Se compara por marcador: si un pin no cambia, no se toca su DOM.
+  const markerSignatures = new Map(
+    markers.map((marker, index) => {
       const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
         marker.props;
-      return JSON.stringify({
-        lat: coordinate.latitude,
-        lng: coordinate.longitude,
-        slug: discoteca?.slug,
-        title,
-        color: discoteca?.color,
-        selected,
-        hasAlerts,
-        eventImage,
-      });
-    })
-    .join('|');
+      return [
+        markerId(marker, index),
+        JSON.stringify({
+          lat: coordinate.latitude,
+          lng: coordinate.longitude,
+          slug: discoteca?.slug,
+          title,
+          color: discoteca?.color,
+          selected,
+          hasAlerts,
+          eventImage,
+        }),
+      ] as const;
+    }),
+  );
+  const markersKey = [...markerSignatures.values()].join('|');
+
+  // El handler de cada pin se lee siempre por referencia: así un marcador que
+  // no ha cambiado visualmente puede seguir vivo sin quedarse con un closure
+  // viejo.
+  const markerPressRef = React.useRef<Map<string, () => void>>(new Map());
+  markerPressRef.current = new Map(
+    markers.map((marker, index) => [
+      markerId(marker, index),
+      () => marker.props.onPress?.(),
+    ]),
+  );
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -501,20 +550,24 @@ export function MapViewComponent({
   usePointsClusterLayer(map, points, onPointPress);
   useRouteLayer(map, routeCoordinates);
 
-  // Marcadores de discotecas: se recrean cuando cambian los children.
+  // Marcadores de discotecas: se actualizan uno a uno. Solo se recrea el DOM
+  // del pin cuya firma cambió (p.ej. le llegó la foto del evento o se
+  // seleccionó); el resto se queda tal cual. Recrearlos todos hacía que el
+  // mapa parpadeara cada vez que entraba una foto, que llegan de una en una.
   React.useEffect(() => {
     if (!map) return;
     const m = map;
-    const instances = markers.map((marker) => {
-      const {
-        coordinate,
-        onPress: onMarkerPress,
-        discoteca,
-        title,
-        selected,
-        hasAlerts,
-        eventImage,
-      } = marker.props;
+    const vivos = discotecaMarkersRef.current;
+
+    markers.forEach((marker, index) => {
+      const id = markerId(marker, index);
+      const firma = markerSignatures.get(id) ?? '';
+      const existente = vivos.get(id);
+      if (existente?.firma === firma) return;
+      existente?.marker.remove();
+
+      const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
+        marker.props;
       const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
       const color = discoteca?.color ?? '#ff4d4d';
       const discotecaFallback: Discoteca = {
@@ -535,17 +588,34 @@ export function MapViewComponent({
       markerEl.style.cursor = 'pointer';
       markerEl.addEventListener('click', (event) => {
         event.stopPropagation();
-        onMarkerPress?.();
+        markerPressRef.current.get(id)?.();
       });
 
-      return new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
-        .setLngLat([coordinate.longitude, coordinate.latitude])
-        .addTo(m);
+      vivos.set(id, {
+        firma,
+        marker: new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
+          .setLngLat([coordinate.longitude, coordinate.latitude])
+          .addTo(m),
+      });
     });
 
-    return () => instances.forEach((instance) => instance.remove());
+    vivos.forEach((entrada, id) => {
+      if (!markerSignatures.has(id)) {
+        entrada.marker.remove();
+        vivos.delete(id);
+      }
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, markersKey]);
+
+  // Al desmontar (o cambiar de mapa) se limpian todos de una vez.
+  React.useEffect(() => {
+    const vivos = discotecaMarkersRef.current;
+    return () => {
+      vivos.forEach((entrada) => entrada.marker.remove());
+      vivos.clear();
+    };
+  }, [map]);
 
   return (
     <View style={[styles.webMap, style]}>

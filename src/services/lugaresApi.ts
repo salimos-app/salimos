@@ -1,6 +1,7 @@
 import { Sitio } from '../types/sitio';
 import { ParadaTaxi, RadioTaxiInfo } from '../types/taxi';
 import { getApiBaseUrls } from '../config/api';
+import { fetchWithFallback } from './httpClient';
 
 /**
  * Bares, pubs, supermercados y tiendas de conveniencia que conoce el backend
@@ -8,25 +9,14 @@ import { getApiBaseUrls } from '../config/api';
  */
 export async function fetchSitios(): Promise<Sitio[]> {
   const urls = getApiBaseUrls().map((baseUrl) => `${baseUrl}/api/sitios`);
-  let lastError: unknown = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      if (Array.isArray(payload?.data)) {
-        return payload.data as Sitio[];
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando sitios desde ${url}:`, error);
-    }
-  }
-
-  throw lastError ?? new Error('No se pudo cargar el listado de sitios.');
+  return fetchWithFallback(
+    urls,
+    (payload) => {
+      const data = (payload as { data?: unknown })?.data;
+      return Array.isArray(data) ? (data as Sitio[]) : undefined;
+    },
+    { label: 'sitios' },
+  );
 }
 
 export interface ParadasTaxi {
@@ -40,23 +30,12 @@ export interface ParadasTaxi {
  */
 export async function fetchParadasTaxi(): Promise<ParadasTaxi> {
   const urls = getApiBaseUrls().map((baseUrl) => `${baseUrl}/api/taxis`);
-  let lastError: unknown = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      if (Array.isArray(payload?.data?.paradas)) {
-        return payload.data as ParadasTaxi;
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando paradas de taxi desde ${url}:`, error);
-    }
-  }
-
-  throw lastError ?? new Error('No se pudo cargar el listado de paradas de taxi.');
+  return fetchWithFallback(
+    urls,
+    (payload) => {
+      const data = (payload as { data?: ParadasTaxi })?.data;
+      return Array.isArray(data?.paradas) ? data : undefined;
+    },
+    { label: 'paradas de taxi' },
+  );
 }
