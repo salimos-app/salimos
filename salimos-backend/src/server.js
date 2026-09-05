@@ -52,6 +52,7 @@ app.get('/', (req, res) => {
       '/api/microsites/:slug/metadata',
       '/api/microsites/:slug/events',
       '/api/microsites/:slug/events/:eventId/tickets-types',
+      '/api/microsites/:slug/events/:code/detail',
       '/api/discotecas/:slug/eventos-cache',
       'POST /api/internal/sweep',
       '/api/directions/:profile',

@@ -1,4 +1,4 @@
-import { Evento, Location, TicketType } from '../types/evento';
+import { Evento, EventoDetalle, Location, TicketType } from '../types/evento';
 import { DiscotecaSinColor } from '../types/discoteca';
 import { getApiBaseUrls } from '../config/api';
 import { fetchWithFallback } from './httpClient';
@@ -111,6 +111,8 @@ function normalizeEventosConImagen(payload: unknown): Evento[] {
         },
         image: typeof item.image === 'string' ? item.image : undefined,
         id: typeof item.id === 'string' ? item.id : undefined,
+        code: typeof item.code === 'string' ? item.code : undefined,
+        age: typeof item.age === 'number' ? item.age : undefined,
       };
     });
 }
@@ -187,17 +189,18 @@ export async function fetchDiscotecaCoordinates(
 }
 
 /**
- * Solo la foto del próximo evento con imagen (o `null`). Pega únicamente
- * contra /events, sin el fallback a /metadata de `fetchProximosEventos`:
- * al arrancar solo interesa la foto para el pin, y /metadata nunca trae
- * imágenes, así que ese fallback solo sumaría peticiones inútiles.
+ * El próximo evento con imagen (o `null` si no hay ninguno). Pega
+ * únicamente contra /events, sin el fallback a /metadata de
+ * `fetchProximosEventos`: al arrancar solo interesa esto para el pin y la
+ * tarjeta de la discoteca, y /metadata nunca trae imágenes, así que ese
+ * fallback solo sumaría peticiones inútiles.
  * @param slug Identificador del microsite en Fourvenues
  */
-export async function fetchEventImage(slug: string): Promise<string | null> {
+export async function fetchNextEvento(slug: string): Promise<Evento | null> {
   return fetchWithFallback(
     getEventsUrls(slug),
-    (payload) => normalizeEventosConImagen(payload).find((evento) => evento.image)?.image,
-    { label: `foto de evento (${slug})`, fallbackValue: null },
+    (payload) => normalizeEventosConImagen(payload).find((evento) => evento.image),
+    { label: `próximo evento (${slug})`, fallbackValue: null },
   );
 }
 
@@ -276,6 +279,36 @@ export async function fetchEventTicketTypes(
   );
   return fetchWithFallback(urls, normalizeTicketTypes, {
     label: 'precios de entradas',
+  });
+}
+
+function normalizeEventoDetalle(payload: unknown): EventoDetalle {
+  if (typeof payload !== 'object' || payload === null) {
+    return {};
+  }
+  const data = (payload as Record<string, unknown>).data;
+  if (typeof data !== 'object' || data === null) {
+    return {};
+  }
+  const d = data as Record<string, unknown>;
+  return {
+    dressCode: typeof d.perch === 'string' ? d.perch : undefined,
+    services: Array.isArray(d.services) ? d.services.filter((s): s is string => typeof s === 'string') : undefined,
+  };
+}
+
+/**
+ * Detalle de un evento concreto (código de vestimenta, qué ofrece), aparte
+ * del listado. Necesita `code` (el corto de la URL pública, distinto del
+ * `id` interno que pide fetchEventTicketTypes).
+ * @param slug Identificador del microsite en Fourvenues
+ * @param code Código corto del evento (`Evento.code`)
+ */
+export async function fetchEventDetail(slug: string, code: string): Promise<EventoDetalle> {
+  const urls = getApiBaseUrls().map((baseUrl) => `${baseUrl}/api/microsites/${slug}/events/${code}/detail`);
+  return fetchWithFallback(urls, (payload) => normalizeEventoDetalle(payload), {
+    label: 'detalle del evento',
+    fallbackValue: {},
   });
 }
 

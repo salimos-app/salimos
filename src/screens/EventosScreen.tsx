@@ -233,7 +233,7 @@ export default function EventosScreen({ discoteca, onBack }: Props) {
 
           <FlatList
             data={restoDelDia}
-            keyExtractor={(item, index) => `${item.name}-${index}`}
+            keyExtractor={(item, index) => item.id ?? `${item.name}-${index}`}
             renderItem={renderEvento}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
