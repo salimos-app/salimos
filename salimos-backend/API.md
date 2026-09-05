@@ -210,6 +210,53 @@ memoria de 10 min (`CACHE_TTL_MS` en [microsites.js](src/routes/microsites.js)):
 `:eventId` es el `id` que trae cada evento en `/api/microsites/:slug/events`
 (campo `Evento.id` en la app), **no** el `code` corto de la URL pública.
 
+## Registro anónimo y telemetría
+
+Dos rutas de **escritura** (el resto del backend es proxy de solo lectura).
+Usan las mismas credenciales de Turso que el snapshot; crean sus tablas solas
+la primera vez (`ensureSchemaOnce`, no hace falta `npm run seed:data`).
+
+### `POST /api/usuarios`
+
+Alta o heartbeat de una instalación anónima. **Sin cuentas ni login.** La app
+genera un UUID la primera vez que arranca, lo guarda en el dispositivo
+(SecureStore / localStorage) y lo reenvía en cada arranque.
+
+```json
+{ "installId": "e2b1...-uuid", "plataforma": "android", "osVersion": "14",
+  "deviceModel": "Pixel 7", "appVersion": "1.0.0", "buildVersion": "1",
+  "locale": "es-ES", "timezone": "Europe/Madrid", "installTime": 1725000000000,
+  "installReferrer": "utm_source=google-play&utm_medium=organic", "idForVendor": null }
+```
+
+- Solo `installId` (UUID) es obligatorio; el resto es best-effort.
+- Idempotente: upsert por `installId` — refresca metadatos, mueve `ultima_vez`,
+  suma `aperturas`. `install_time` / `install_referrer` / `id_for_vendor` no se
+  pisan con `null` una vez guardados.
+- `install_referrer` (solo Android) sale de `getInstallReferrerAsync()` de
+  Play Store: es la única señal de "de dónde vino la descarga". Play Console /
+  App Store Connect **no** dan datos de descarga por usuario.
+- Respuesta: `204` sin cuerpo. `400` si el `installId` no es un UUID.
+
+### `POST /api/telemetria`
+
+Lote de eventos de uso. La app los encola y los manda en tandas (20 eventos,
+cada 15 s, o al pasar a segundo plano).
+
+```json
+{ "installId": "e2b1...-uuid", "eventos": [
+  { "nombre": "app_abierta", "ts": 1725000000000 },
+  { "nombre": "discoteca_seleccionada", "props": { "slug": "banana" }, "ts": 1725000005000 } ] }
+```
+
+- Máx. 50 eventos por lote; `props` se serializa a JSON y se recorta a 2000 chars.
+- Eventos sin `nombre` se descartan en silencio (no tumban el lote).
+- `ocurrio_en` lo pone el cliente (`ts`), `recibido_en` el backend.
+- Respuesta: `204`. `400` si `installId` no es UUID o `eventos` va vacío.
+
+Consultar los datos: SQL directo contra Turso (`SELECT * FROM usuarios`,
+`SELECT evento, COUNT(*) FROM telemetria GROUP BY evento`, etc.). No hay panel.
+
 ## Snapshot semanal (Turso) — `npm run sweep`
 
 `GET /api/microsites/:slug/events` pega a Fourvenues en vivo cada vez (con
