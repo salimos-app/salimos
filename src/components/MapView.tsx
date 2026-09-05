@@ -81,7 +81,6 @@ function pinNameLabelHtml(item){
 // cambios de posición y el pin se quedaría a medio camino del mapa mientras
 // arrastras. Por eso el escalado va en un div interior aparte.
 function discotecaPinHtml(item){
-  const initial=(item.title||'?').charAt(0).toUpperCase();
   const sel=!!item.selected;
   const alertBadge=item.hasAlerts?'<div style="position:absolute;top:-2px;left:-4px;width:15px;height:15px;border-radius:50%;background:${colors.warning};border:2px solid ${colors.background};box-shadow:0 0 0 1px rgba(0,0,0,.35);"></div>':'';
   if(item.eventImage){
@@ -97,7 +96,7 @@ function discotecaPinHtml(item){
     +pinNameLabelHtml(item)
     +'<div style="position:relative;width:36px;height:42px;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));">'
     +'<svg width="36" height="42" viewBox="0 0 36 42"><path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z" fill="'+item.color+'${PIN_FILL_ALPHA}" stroke="'+(sel?'#ffffff':'${colors.background}')+'" stroke-width="'+(sel?2.5:1.5)+'"/></svg>'
-    +'<div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-weight:${PIN_ACCENT_FONT_WEIGHT};font-size:14px;font-family:${MAP_FONT_FAMILY};text-shadow:0 1px 3px rgba(0,0,0,.45);">'+initial+'</div>'
+    +'<div style="position:absolute;top:9px;left:0;right:0;display:flex;justify-content:center;"><svg width="17" height="17" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="'+pinIconPaths.discoteca+'"/></svg></div>'
     +alertBadge+'</div></div></div>';
   return html;
 }

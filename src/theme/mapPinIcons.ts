@@ -7,7 +7,7 @@
  */
 export const PIN_ICON_VIEWBOX = '0 -960 960 960';
 
-export const PIN_ICON_PATHS: Record<string, string> = {
+export const PIN_ICON_PATHS = {
   // assets/icons/taxi.svg
   taxi: 'M240-200v80H120v-360l98-280h142v-80h240v80h142l98 280v360H720v-80H240Zm-8-360h496l-42-120H274l-42 120Zm68 240q25 0 42.5-17.5T360-380q0-25-17.5-42.5T300-440q-25 0-42.5 17.5T240-380q0 25 17.5 42.5T300-320Zm360 0q25 0 42.5-17.5T720-380q0-25-17.5-42.5T660-440q-25 0-42.5 17.5T600-380q0 25 17.5 42.5T660-320Z',
   // assets/icons/bar.svg
@@ -18,4 +18,13 @@ export const PIN_ICON_PATHS: Record<string, string> = {
   supermarket: 'M223.5-103.5Q200-127 200-160t23.5-56.5Q247-240 280-240t56.5 23.5Q360-193 360-160t-23.5 56.5Q313-80 280-80t-56.5-23.5Zm400 0Q600-127 600-160t23.5-56.5Q647-240 680-240t56.5 23.5Q760-193 760-160t-23.5 56.5Q713-80 680-80t-56.5-23.5ZM208-800h660L669-440H324l-44 80h480v80H145l119-216-144-304H40v-80h130l38 80Z',
   // assets/icons/tienda.svg
   convenience: 'M160-720v-80h640v80H160Zm0 560v-240h-40v-80l40-200h640l40 200v80h-40v240h-80v-240H560v240H160Zm80-80h240v-160H240v160Z',
+  // assets/icons/discoteca.svg
+  discoteca: 'M177-160v-60h84v-204L40-760h502L321-424v204h84v60H177Zm23-454h182l55-86H145l55 86Zm352.5 421.5Q520-225 520-275t32.5-82.5Q585-390 635-390q15 0 28.5 3t26.5 8v-381h190v99H750v386q0 50-32.5 82.5T635-160q-50 0-82.5-32.5Z',
 };
+
+export type PinIconKind = keyof typeof PIN_ICON_PATHS;
+
+/** Path del ícono para un `kind` dinámico (p.ej. `SimpleMapPoint.kind`); `undefined` si no hay uno para esa categoría. */
+export function pinIconPath(kind: string | undefined): string | undefined {
+  return kind && kind in PIN_ICON_PATHS ? PIN_ICON_PATHS[kind as PinIconKind] : undefined;
+}

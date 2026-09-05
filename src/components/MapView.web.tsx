@@ -18,7 +18,7 @@ import {
   PIN_ICON_DROP_SHADOW,
   PIN_LABEL_FONT_WEIGHT,
 } from '../theme/mapPins';
-import { PIN_ICON_PATHS, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
+import { pinIconPath, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
 import {
   MarkerProps,
   MapViewProps,
@@ -151,7 +151,7 @@ function discotecaMarkerHtml(
     `;
   }
 
-  const initial = (discoteca.nombre || '?').charAt(0).toUpperCase();
+  const discotecaIconPath = pinIconPath('discoteca');
   return `
     <div style="width:140px;">
       <div style="display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
@@ -161,7 +161,9 @@ function discotecaMarkerHtml(
             <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
               fill="${discoteca.color}${PIN_FILL_ALPHA}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
           </svg>
-          <div style="position:absolute; top:8px; left:0; right:0; text-align:center; color:#ffffff; font-weight:${PIN_ACCENT_FONT_WEIGHT}; font-size:14px; font-family:${MAP_FONT_FAMILY}; text-shadow:0 1px 3px rgba(0,0,0,.45);">${initial}</div>
+          <div style="position:absolute; top:9px; left:0; right:0; display:flex; justify-content:center;">
+            <svg width="17" height="17" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${discotecaIconPath}"/></svg>
+          </div>
           ${hasAlerts ? ALERT_BADGE_HTML : ''}
         </div>
       </div>
@@ -193,7 +195,7 @@ function clusterMarkerHtml(count: number) {
 
 /** Ícono del pin: SVG de Material Symbols por categoría (`kind`); si no hay una conocida, cae al emoji. */
 function simplePointIcon(kind: string | undefined, fallbackEmoji: string) {
-  const path = kind ? PIN_ICON_PATHS[kind] : undefined;
+  const path = pinIconPath(kind);
   if (!path) return fallbackEmoji;
   return `<svg width="16" height="16" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${path}"/></svg>`;
 }

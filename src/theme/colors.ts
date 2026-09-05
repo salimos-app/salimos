@@ -44,3 +44,19 @@ export const gradients = {
 
 // Paradas del degradado usado para pintar la ruta ("cómo llegar") en el mapa.
 export const BRAND_GRADIENT = [colors.gradientStart, colors.gradientEnd] as const;
+
+/**
+ * Oscurece un color hex un `amount` (0-1) escalando sus canales RGB — para
+ * trazos/bordes que deben leerse como "el mismo color, más oscuro" en vez de
+ * un tono completamente distinto (p.ej. el borde de un botón sobre su
+ * propio relleno).
+ */
+export function darkenHex(hex: string, amount: number): string {
+  const clean = hex.replace('#', '');
+  const num = parseInt(clean, 16);
+  const factor = 1 - Math.min(1, Math.max(0, amount));
+  const r = Math.round(((num >> 16) & 0xff) * factor);
+  const g = Math.round(((num >> 8) & 0xff) * factor);
+  const b = Math.round((num & 0xff) * factor);
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+}

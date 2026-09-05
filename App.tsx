@@ -56,11 +56,14 @@ function mejorDiscoteca(discotecas: Discoteca[]): Discoteca | null {
 
 type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
 
+// Orden de abajo hacia arriba = orden de una salida (taxi → súper → bar →
+// discoteca), que además va de los colores más cálidos/tarde a los más
+// fríos/noche de la paleta (ver CLAUDE.md → Decisiones de diseño).
 const FILTROS: FiltroOpcion[] = [
-  { id: 'discotecas', icon: '🪩', label: 'Discotecas', color: colors.neonPink },
-  { id: 'bares', icon: '🍺', label: 'Bares', color: colors.neonPurple },
-  { id: 'supermercados', icon: '🛒', label: 'Supermercados', color: colors.neonGreen },
-  { id: 'taxis', icon: '🚕', label: 'Taxis', color: colors.neonYellow },
+  { id: 'taxis', icon: '🚕', iconKind: 'taxi', label: 'taxis', color: CATEGORY_COLORS.taxi },
+  { id: 'supermercados', icon: '🛒', iconKind: 'supermarket', label: 'supermercados', color: CATEGORY_COLORS.supermercado },
+  { id: 'bares', icon: '🍺', iconKind: 'bar', label: 'bares', color: CATEGORY_COLORS.bar },
+  { id: 'discotecas', icon: '🪩', iconKind: 'discoteca', label: 'discotecas', color: CATEGORY_COLORS.discoteca },
 ];
 
 SplashScreen.preventAutoHideAsync();
