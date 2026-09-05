@@ -69,11 +69,18 @@ Detalle de **un solo evento** por su `code` corto (el de la URL pública:
 coordenadas exactas (`location.coordinates`), dirección estructurada
 (`location.address`, `location.municipality`, `location.postalCode`...),
 `services` (qué ofrece: `"listas"`, `"entradas"`, `"reservados"`), edad
-mínima, y un campo `bookingFlowStart` que indica el siguiente paso del flujo
-de compra (visto: `"zones"`).
+mínima (`age`, aunque esta también viene ya en `/api/events` de arriba —
+no hace falta pedir el detalle solo por eso), un campo `perch` sin
+documentar (visto siempre `"casual"` en las discotecas de este proyecto;
+por el valor, parece ser el código de vestimenta, pero no está confirmado
+por Fourvenues) y `bookingFlowStart`, que indica el siguiente paso del
+flujo de compra (visto: `"zones"`).
 
 **No trae precios.** Para eso hace falta el `id` interno (no el `code`) y el
 endpoint de abajo.
+
+Lo expone nuestro backend cacheado 10 min en
+`GET /api/microsites/:slug/events/:code/detail` (ver [microsites.js](src/routes/microsites.js)).
 
 ### `GET /api/events/:eventId/tickets-types?slug=X`
 
@@ -197,6 +204,7 @@ memoria de 10 min (`CACHE_TTL_MS` en [microsites.js](src/routes/microsites.js)):
 | `GET /api/microsites/:slug/metadata` | `GET /api/microsites/:slug/metadata` | Igual, sin tocar |
 | `GET /api/microsites/:slug/events` | `GET /api/events?slug=X&startDate=hoy&endDate=+90d` (todas las páginas agregadas) | `{"data": [...]}` con imagen |
 | `GET /api/microsites/:slug/events/:eventId/tickets-types` | `GET /api/events/:eventId/tickets-types?slug=X` | Igual, sin tocar |
+| `GET /api/microsites/:slug/events/:code/detail` | `GET /api/events/:code` | Igual, sin tocar |
 | `GET /api/discotecas/:slug/eventos-cache` | *(no pega a Fourvenues, lee de la BD)* | Snapshot semanal de eventos, ver abajo |
 
 `:eventId` es el `id` que trae cada evento en `/api/microsites/:slug/events`

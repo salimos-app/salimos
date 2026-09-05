@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -21,12 +21,21 @@ import { formatDistance, formatDuration } from '../utils/format';
 import { distanceMeters, ordenarPorCercania, LatLngLike } from '../utils/geo';
 import { MapViewComponent, SimpleMapPoint } from './../components/MapView';
 
+/** Preselección para montar el plan automáticamente (ver App.tsx: pregunta "botellona en casa o algo fuera"). */
+export interface AutoPlan {
+  taxiIdaId: string | null;
+  paradaIntermediaId: string | null;
+  taxiVueltaId: string | null;
+}
+
 interface Props {
   discoteca: Discoteca;
   discotecaCoords: LatLng;
   sitios: Sitio[];
   paradasTaxi: ParadaTaxi[];
   onBack: () => void;
+  /** Si se pasa, preselecciona estas paradas y calcula la ruta automáticamente al entrar. */
+  autoPlan?: AutoPlan | null;
 }
 
 type CategoriaParada = 'bar' | 'supermarket' | 'bazar';
@@ -168,6 +177,7 @@ export default function RoutePlannerScreen({
   sitios,
   paradasTaxi,
   onBack,
+  autoPlan,
 }: Props) {
   const [taxiIda, setTaxiIda] = useState<ParadaTaxi | null>(null);
   const [categoriaParada, setCategoriaParada] = useState<CategoriaParada | null>(null);
@@ -220,7 +230,19 @@ export default function RoutePlannerScreen({
     setParadaIntermedia(null);
   };
 
-  const handleCalcular = async () => {
+  // Acepta overrides puntuales (usados por el auto-plan al montar la
+  // pantalla) porque `setTaxiIda`/`setParadaIntermedia`/`setTaxiVuelta` son
+  // asíncronos: si se llama justo después de seleccionarlos, el estado
+  // todavía no reflejaría el cambio dentro de este mismo tick.
+  const handleCalcular = async (overrides?: {
+    taxiIda: ParadaTaxi | null;
+    paradaIntermedia: Sitio | null;
+    taxiVuelta: ParadaTaxi | null;
+  }) => {
+    const taxiIdaEfectivo = overrides ? overrides.taxiIda : taxiIda;
+    const paradaEfectiva = overrides ? overrides.paradaIntermedia : paradaIntermedia;
+    const taxiVueltaEfectivo = overrides ? overrides.taxiVuelta : taxiVuelta;
+
     setLocationError(null);
     setLocating(true);
     try {
@@ -229,8 +251,8 @@ export default function RoutePlannerScreen({
         { tipo: 'ubicacion', id: 'origen', label: 'Tu ubicación', icon: '📍', ...ubicacion },
       ];
 
-      if (taxiIda) paradas.push(taxiToParada(taxiIda, taxiIda.nombre));
-      if (paradaIntermedia) paradas.push(sitioToParada(paradaIntermedia));
+      if (taxiIdaEfectivo) paradas.push(taxiToParada(taxiIdaEfectivo, taxiIdaEfectivo.nombre));
+      if (paradaEfectiva) paradas.push(sitioToParada(paradaEfectiva));
       paradas.push({
         tipo: 'discoteca',
         id: discoteca.id,
@@ -238,7 +260,7 @@ export default function RoutePlannerScreen({
         icon: '🪩',
         ...discotecaCoords,
       });
-      if (taxiVuelta) paradas.push(taxiToParada(taxiVuelta, taxiVuelta.nombre));
+      if (taxiVueltaEfectivo) paradas.push(taxiToParada(taxiVueltaEfectivo, taxiVueltaEfectivo.nombre));
 
       const casaCoord = casa ?? ubicacion;
       paradas.push({
@@ -256,6 +278,32 @@ export default function RoutePlannerScreen({
       setLocating(false);
     }
   };
+
+  // Monta el plan automáticamente si venimos de la pregunta "botellona en
+  // casa o algo fuera" del hub del mapa: preselecciona lo ya decidido
+  // (taxis, parada intermedia) y calcula la ruta sin esperar a que el
+  // usuario toque "Calcular". Se aplica una sola vez (guardia con `ref`
+  // por si el efecto se re-dispara en modo estricto).
+  const autoPlanAplicado = useRef(false);
+  useEffect(() => {
+    if (!autoPlan || autoPlanAplicado.current) return;
+    autoPlanAplicado.current = true;
+
+    const taxiIdaSel = autoPlan.taxiIdaId ? paradasTaxi.find((t) => t.id === autoPlan.taxiIdaId) ?? null : null;
+    const taxiVueltaSel = autoPlan.taxiVueltaId ? paradasTaxi.find((t) => t.id === autoPlan.taxiVueltaId) ?? null : null;
+    const paradaSel = autoPlan.paradaIntermediaId ? sitios.find((s) => s.id === autoPlan.paradaIntermediaId) ?? null : null;
+
+    if (taxiIdaSel) setTaxiIda(taxiIdaSel);
+    if (taxiVueltaSel) setTaxiVuelta(taxiVueltaSel);
+    if (paradaSel) {
+      const categoria = CATEGORIAS.find((c) => CATEGORIA_INFO[c].categoriasSitio.includes(paradaSel.categoria));
+      if (categoria) setCategoriaParada(categoria);
+      setParadaIntermedia(paradaSel);
+    }
+
+    handleCalcular({ taxiIda: taxiIdaSel, paradaIntermedia: paradaSel, taxiVuelta: taxiVueltaSel });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoPlan]);
 
   const handleReiniciar = () => {
     setTaxiIda(null);
@@ -475,7 +523,7 @@ export default function RoutePlannerScreen({
           )}
         </View>
 
-        <TouchableOpacity onPress={handleCalcular} activeOpacity={0.85} disabled={calculando} style={styles.calcularWrap}>
+        <TouchableOpacity onPress={() => handleCalcular()} activeOpacity={0.85} disabled={calculando} style={styles.calcularWrap}>
           <LinearGradient
             colors={gradients.brand}
             start={{ x: 0, y: 0 }}

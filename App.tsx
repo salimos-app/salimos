@@ -1,32 +1,37 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, TouchableOpacity, StyleSheet, Image, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { colors, gradients } from './src/theme/colors';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { colors } from './src/theme/colors';
 import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
 import DiscotecaMarker from './src/components/DiscotecaMarker';
 import EventosScreen from './src/screens/EventosScreen';
-import RoutePlannerScreen from './src/screens/RoutePlannerScreen';
-import AlertsPanel from './src/components/AlertsPanel';
-import RoutePanel from './src/components/RoutePanel';
+import RoutePlannerScreen, { AutoPlan } from './src/screens/RoutePlannerScreen';
 import PointCard from './src/components/PointCard';
 import FiltrosBurbujas, { FiltroOpcion } from './src/components/FiltrosBurbujas';
 import DiscotecasListView from './src/components/DiscotecasListView';
+import DiscotecaCard from './src/components/DiscotecaCard';
+import CategoriaCercaniaOverlay from './src/components/CategoriaCercaniaOverlay';
+import PreguntaPlanModal from './src/components/PreguntaPlanModal';
 import { useRoute } from './src/hooks/useRoute';
 import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
 import {
   fetchDiscotecas,
-  fetchEventImage,
+  fetchNextEvento,
+  fetchEventTicketTypes,
+  fetchEventDetail,
+  precioDesde,
   DiscotecaCoordinates,
 } from './src/services/eventosApi';
 import { fetchSitios, fetchParadasTaxi } from './src/services/lugaresApi';
-import { Sitio } from './src/types/sitio';
+import { Sitio, SitioCategoria } from './src/types/sitio';
 import { ParadaTaxi } from './src/types/taxi';
+import { Evento, EventoDetalle } from './src/types/evento';
 import { SITIO_ESTILO } from './src/utils/sitioEstilo';
 import { getCurrentLocation } from './src/services/location';
 import { LatLng } from './src/services/directionsApi';
 import { forEachLimit } from './src/utils/concurrency';
+import { ordenarPorCercania } from './src/utils/geo';
 
 // Acento de color por discoteca: es un detalle puramente visual (no lo
 // manda el backend), se asigna por índice ciclando esta paleta.
@@ -37,6 +42,12 @@ function conColor(discotecas: DiscotecaSinColor[]): Discoteca[] {
     ...discoteca,
     color: DISCOTECA_COLOR_PALETTE[index % DISCOTECA_COLOR_PALETTE.length],
   }));
+}
+
+/** La discoteca con mejor valoración (sin rating, al final); `null` si no hay ninguna. */
+function mejorDiscoteca(discotecas: Discoteca[]): Discoteca | null {
+  if (discotecas.length === 0) return null;
+  return [...discotecas].sort((a, b) => (b.rating ?? -1) - (a.rating ?? -1))[0];
 }
 
 type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
@@ -150,12 +161,14 @@ export default function App() {
   const [selectedPoint, setSelectedPoint] = useState<SimpleMapPoint | null>(null);
   const [viewMode, setViewMode] = useState<'map' | 'list'>('map');
   const [userLocation, setUserLocation] = useState<LatLng | null>(null);
-  const [filtros, setFiltros] = useState<Record<FiltroCategoria, boolean>>({
-    discotecas: true,
-    bares: true,
-    supermercados: true,
-    taxis: true,
-  });
+  // Categoría cuyo listado por cercanía está abierto (al tocar una burbuja
+  // que no sea "discotecas": esa se resuelve directo a la mejor valorada,
+  // ver `handleBubbleSelect`).
+  const [categoriaOverlay, setCategoriaOverlay] = useState<FiltroCategoria | null>(null);
+  // Pregunta "¿botellona en casa o algo fuera?" que dispara el segundo
+  // toque en el hub del mapa (ver FiltrosBurbujas.onCollapse).
+  const [preguntaPlan, setPreguntaPlan] = useState(false);
+  const [autoPlan, setAutoPlan] = useState<AutoPlan | null>(null);
   // Las coordenadas ya vienen en el listado del backend (`/api/discotecas`),
   // así que se derivan de ahí en vez de pedirlas una a una a Fourvenues.
   // Mientras responde el backend se usan las de la semilla local.
@@ -173,30 +186,40 @@ export default function App() {
   // simplemente nunca reciben alertas (badge nunca se enciende).
   const alertsBySlug = useAlertsForSlugs(discotecaSlugs);
 
-  // Foto del próximo evento de cada discoteca: es lo más importante
-  // visualmente del pin (reemplaza la inicial) y también se usa en la
-  // tarjeta del mapa en vez de la foto genérica del local. El mapa se pinta
-  // ya con la imagen genérica (modo "thumbnail") y estas fotos van entrando
-  // poco a poco en segundo plano (ver más abajo). Las discotecas sin ficha
-  // en Fourvenues simplemente no consiguen foto y se quedan con la genérica.
-  const [eventImageBySlug, setEventImageBySlug] = useState<Record<string, string | null>>({});
+  // Próximo evento (con foto) de cada discoteca: la foto es lo más
+  // importante visualmente del pin (reemplaza la inicial) y también se usa
+  // en la tarjeta del mapa en vez de la foto genérica del local; el resto
+  // del evento (nombre, fecha, edad) alimenta la tarjeta de discoteca (ver
+  // más abajo). El mapa se pinta ya con la imagen genérica (modo
+  // "thumbnail") y estos datos van entrando poco a poco en segundo plano.
+  // Las discotecas sin ficha en Fourvenues simplemente no consiguen evento
+  // y se quedan con la genérica.
+  const [nextEventoBySlug, setNextEventoBySlug] = useState<Record<string, Evento | null>>({});
+
+  const eventImageBySlug = useMemo<Record<string, string | null>>(() => {
+    const mapa: Record<string, string | null> = {};
+    for (const [slug, evento] of Object.entries(nextEventoBySlug)) {
+      mapa[slug] = evento?.image ?? null;
+    }
+    return mapa;
+  }, [nextEventoBySlug]);
 
   const selectedClub = selectedMarkerSlug
     ? discotecas.find((discoteca) => discoteca.slug === selectedMarkerSlug) ?? null
     : null;
 
-  const currentEventImage = selectedClub ? eventImageBySlug[selectedClub.slug] ?? null : null;
+  const nextEvento = selectedClub ? nextEventoBySlug[selectedClub.slug] : null;
 
   useEffect(() => {
     let mounted = true;
 
     // Se piden "poco a poco" (máx. 3 a la vez) en vez de una petición por
     // discoteca de golpe: así el arranque no revienta el rate-limiter del
-    // backend y el mapa ya se ve mientras las fotos van cargando.
+    // backend y el mapa ya se ve mientras van cargando.
     forEachLimit(discotecas, 3, async (discoteca) => {
-      const imagen = await fetchEventImage(discoteca.slug);
+      const evento = await fetchNextEvento(discoteca.slug);
       if (mounted) {
-        setEventImageBySlug((prev) => ({ ...prev, [discoteca.slug]: imagen }));
+        setNextEventoBySlug((prev) => ({ ...prev, [discoteca.slug]: evento }));
       }
     });
 
@@ -205,16 +228,44 @@ export default function App() {
     };
   }, [discotecas]);
 
-  const visiblePoints = useMemo(
-    () => mapPoints.filter((point) => filtros[filtroDe(point)]),
-    [mapPoints, filtros]
-  );
+  // Precio y detalle (código de vestimenta, qué ofrece) del evento de la
+  // discoteca seleccionada: a diferencia de la foto, esto solo interesa
+  // para la que está abierta en este momento, así que se pide aparte (no
+  // para las demás discotecas del mapa).
+  const [eventoExtra, setEventoExtra] = useState<{ precio: number | null; detalle: EventoDetalle } | null>(null);
 
-  // El modo lista ordena por cercanía, así que en cuanto se entra ahí se
-  // pide la ubicación una vez (en el momento, como el resto de la app); si
-  // no hay permiso, la lista simplemente cae a orden alfabético.
   useEffect(() => {
-    if (viewMode !== 'list' || userLocation) return;
+    setEventoExtra(null);
+    if (!selectedClub || !nextEvento) return;
+    let mounted = true;
+
+    Promise.allSettled([
+      nextEvento.id ? fetchEventTicketTypes(selectedClub.slug, nextEvento.id) : Promise.resolve([]),
+      nextEvento.code ? fetchEventDetail(selectedClub.slug, nextEvento.code) : Promise.resolve({}),
+    ]).then(([precios, detalle]) => {
+      if (!mounted) return;
+      setEventoExtra({
+        precio: precios.status === 'fulfilled' ? precioDesde(precios.value) : null,
+        detalle: detalle.status === 'fulfilled' ? detalle.value : {},
+      });
+    });
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedClub, nextEvento]);
+
+  // Ya no hay filtro on/off: las burbujas del hub abren un listado o
+  // seleccionan la mejor discoteca (ver handleBubbleSelect), así que todas
+  // las categorías se muestran siempre en el mapa.
+  const visiblePoints = mapPoints;
+
+  // El modo lista y los listados por cercanía del hub ordenan por cercanía,
+  // así que en cuanto se entra a cualquiera de los dos se pide la ubicación
+  // una vez (en el momento, como el resto de la app); si no hay permiso, las
+  // listas simplemente caen a orden alfabético.
+  useEffect(() => {
+    if ((viewMode !== 'list' && !categoriaOverlay) || userLocation) return;
     let mounted = true;
 
     getCurrentLocation()
@@ -228,7 +279,7 @@ export default function App() {
     return () => {
       mounted = false;
     };
-  }, [viewMode, userLocation]);
+  }, [viewMode, categoriaOverlay, userLocation]);
 
   const handleBack = () => {
     setSelectedDiscoteca(null);
@@ -256,11 +307,67 @@ export default function App() {
     clearRoute();
   };
 
-  const toggleFiltro = (id: string) => {
-    setFiltros((prev) => ({ ...prev, [id]: !prev[id as FiltroCategoria] }));
+  // Al tocar una burbuja del hub: "discotecas" va directa a la mejor
+  // valorada (mismo flujo que tocar su pin); el resto abre el listado por
+  // cercanía de esa categoría (ver el overlay más abajo).
+  const handleBubbleSelect = (id: string) => {
+    if (id === 'discotecas') {
+      const mejor = mejorDiscoteca(discotecas);
+      if (mejor) handleMarkerPress(mejor);
+      return;
+    }
     setSelectedMarkerSlug(null);
+    setSelectedDiscoteca(null);
     setSelectedPoint(null);
     clearRoute();
+    setCategoriaOverlay(id as FiltroCategoria);
+  };
+
+  const handleHubCollapse = () => {
+    setPreguntaPlan(true);
+  };
+
+  // Segundo toque en el hub, tras elegir cómo empieza la noche: monta el
+  // plan completo (taxi de ida más cercano, parada intermedia según la
+  // respuesta, mejor discoteca, taxi de vuelta) y lo calcula automáticamente
+  // en el planificador (ver RoutePlannerScreen.autoPlan).
+  const construirPlanOptimo = async (modo: 'casa' | 'bar') => {
+    setPreguntaPlan(false);
+    const mejor = mejorDiscoteca(discotecas);
+    if (!mejor) return;
+
+    let ubicacion = userLocation;
+    if (!ubicacion) {
+      try {
+        ubicacion = await getCurrentLocation();
+        setUserLocation(ubicacion);
+      } catch {
+        // Sin permiso: el planificador la volverá a pedir al calcular.
+      }
+    }
+
+    const discotecaCoords = coordsBySlug[mejor.slug] ?? { latitude: mejor.latitud, longitude: mejor.longitud };
+    const categoriasSitio: SitioCategoria[] = modo === 'casa' ? ['supermarket', 'convenience'] : ['bar', 'pub'];
+    const candidatos = sitios.filter((sitio) => categoriasSitio.includes(sitio.categoria));
+    const paradaIntermedia = ordenarPorCercania(candidatos, ubicacion, (sitio) => ({
+      latitude: sitio.latitud,
+      longitude: sitio.longitud,
+    }))[0];
+    const taxiIda = ordenarPorCercania(paradasTaxi, ubicacion, (parada) => ({
+      latitude: parada.latitud,
+      longitude: parada.longitud,
+    }))[0];
+    const taxiVuelta = ordenarPorCercania(paradasTaxi, discotecaCoords, (parada) => ({
+      latitude: parada.latitud,
+      longitude: parada.longitud,
+    }))[0];
+
+    setAutoPlan({
+      taxiIdaId: taxiIda?.id ?? null,
+      paradaIntermediaId: paradaIntermedia?.id ?? null,
+      taxiVueltaId: taxiVuelta?.id ?? null,
+    });
+    setPlannerDiscoteca(mejor);
   };
 
   const openEventos = (discoteca: Discoteca) => {
@@ -293,7 +400,11 @@ export default function App() {
           discotecaCoords={coords}
           sitios={sitios}
           paradasTaxi={paradasTaxi}
-          onBack={() => setPlannerDiscoteca(null)}
+          onBack={() => {
+            setPlannerDiscoteca(null);
+            setAutoPlan(null);
+          }}
+          autoPlan={autoPlan}
         />
       </View>
     );
@@ -340,8 +451,7 @@ export default function App() {
             points={visiblePoints}
             onPointPress={handlePointPress}
           >
-            {filtros.discotecas &&
-              discotecas.map((discoteca) => {
+            {discotecas.map((discoteca) => {
                 const coords = coordsBySlug[discoteca.slug] ?? {
                   latitude: discoteca.latitud,
                   longitude: discoteca.longitud,
@@ -366,7 +476,7 @@ export default function App() {
         ) : (
           <DiscotecasListView
             discotecas={discotecas}
-            mostrarDiscotecas={filtros.discotecas}
+            mostrarDiscotecas
             coordsBySlug={coordsBySlug}
             eventImageBySlug={eventImageBySlug}
             alertsBySlug={alertsBySlug}
@@ -395,7 +505,22 @@ export default function App() {
         </TouchableOpacity>
       </View>
 
-      <FiltrosBurbujas opciones={FILTROS} activos={filtros} onToggle={toggleFiltro} />
+      <FiltrosBurbujas opciones={FILTROS} onSelect={handleBubbleSelect} onCollapse={handleHubCollapse} />
+
+      {categoriaOverlay && (
+        <CategoriaCercaniaOverlay
+          titulo={`${FILTROS.find((f) => f.id === categoriaOverlay)?.icon ?? ''} ${FILTROS.find((f) => f.id === categoriaOverlay)?.label ?? ''} cerca de ti`}
+          points={mapPoints.filter((point) => filtroDe(point) === categoriaOverlay)}
+          userLocation={userLocation}
+          onClose={() => setCategoriaOverlay(null)}
+          onSelectPoint={(point) => {
+            setCategoriaOverlay(null);
+            handlePointPress(point);
+          }}
+        />
+      )}
+
+      {preguntaPlan && <PreguntaPlanModal onElegir={construirPlanOptimo} onCancelar={() => setPreguntaPlan(false)} />}
 
       {selectedPoint && (
         <PointCard
@@ -412,75 +537,20 @@ export default function App() {
       )}
 
       {selectedClub && (
-        <View style={styles.card}>
-          <View style={styles.imageWrap}>
-            <Image source={{ uri: currentEventImage ?? selectedClub.imagen }} style={styles.image} />
-            <LinearGradient
-              colors={['transparent', colors.backgroundCard]}
-              style={styles.imageFade}
-              pointerEvents="none"
-            />
-          </View>
-          <View style={styles.cardContent}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardNombre}>{selectedClub.nombre}</Text>
-              {selectedClub.rating != null && (
-                <View style={styles.ratingBadge}>
-                  <Text style={styles.ratingText}>⭐ {selectedClub.rating.toFixed(1)}</Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.direccion}>📍 {selectedClub.direccion}</Text>
-
-            <View style={styles.tags}>
-              <View style={[styles.tag, { backgroundColor: selectedClub.color + '22', borderColor: selectedClub.color + '55' }]}>
-                <Text style={[styles.tagText, { color: selectedClub.color }]}>{selectedClub.genero}</Text>
-              </View>
-              {selectedClub.precioEntrada != null && (
-                <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
-                  <Text style={[styles.tagText, { color: colors.neonGreen }]}>💶 {selectedClub.precioEntrada}€</Text>
-                </View>
-              )}
-              {selectedClub.horario && (
-                <View style={styles.tag}>
-                  <Text style={styles.tagTextMuted}>🕐 {selectedClub.horario}</Text>
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.descripcion} numberOfLines={2}>{selectedClub.descripcion}</Text>
-
-            <View style={styles.divider} />
-
-            <AlertsPanel slug={selectedClub.slug} />
-
-            <RoutePanel
-              route={route}
-              loading={routeLoading}
-              error={routeError}
-              onSelectProfile={(profile) =>
-                calculateRoute(profile, { latitude: selectedClub.latitud, longitude: selectedClub.longitud })
-              }
-              onClear={clearRoute}
-            />
-
-            <TouchableOpacity onPress={() => openPlanificador(selectedClub)} activeOpacity={0.85} style={styles.rutaButton}>
-              <Text style={styles.rutaButtonText}>🗺️ Planificar ruta (ida y vuelta)</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={() => openEventos(selectedClub)} activeOpacity={0.85}>
-              <LinearGradient
-                colors={gradients.brand}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 0 }}
-                style={styles.eventosButton}
-              >
-                <Text style={styles.eventosButtonText}>📅 Ver próximos eventos</Text>
-              </LinearGradient>
-            </TouchableOpacity>
-          </View>
-        </View>
+        <DiscotecaCard
+          discoteca={selectedClub}
+          nextEvento={nextEvento}
+          eventoExtra={eventoExtra}
+          route={route}
+          routeLoading={routeLoading}
+          routeError={routeError}
+          onSelectRouteProfile={(profile) =>
+            calculateRoute(profile, { latitude: selectedClub.latitud, longitude: selectedClub.longitud })
+          }
+          onClearRoute={clearRoute}
+          onPlanificarRuta={() => openPlanificador(selectedClub)}
+          onVerEventos={() => openEventos(selectedClub)}
+        />
       )}
     </View>
   );
@@ -534,135 +604,5 @@ const styles = StyleSheet.create({
   },
   viewToggleIcon: {
     fontSize: 16,
-  },
-  card: {
-    position: 'absolute',
-    bottom: 20,
-    left: 16,
-    right: 16,
-    backgroundColor: colors.backgroundCard,
-    borderRadius: 22,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.5,
-    shadowRadius: 18,
-    elevation: 16,
-  },
-  imageWrap: {
-    position: 'relative',
-  },
-  image: {
-    width: '100%',
-    height: 130,
-  },
-  imageFade: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: 36,
-  },
-  cardContent: {
-    padding: 18,
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  cardNombre: {
-    color: colors.textPrimary,
-    fontSize: 21,
-    fontWeight: '800',
-    flex: 1,
-    marginRight: 8,
-    letterSpacing: 0.2,
-  },
-  ratingBadge: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: 10,
-    borderWidth: 1,
-    backgroundColor: colors.neonYellow + '1F',
-    borderColor: colors.neonYellow + '55',
-  },
-  ratingText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: colors.neonYellow,
-  },
-  direccion: {
-    color: colors.textSecondary,
-    fontSize: 13.5,
-    marginBottom: 14,
-  },
-  tags: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
-  },
-  tag: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.backgroundLight,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
-  tagTextMuted: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  descripcion: {
-    color: colors.textMuted,
-    fontSize: 13,
-    lineHeight: 19,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.borderLight,
-    marginTop: 16,
-  },
-  rutaButton: {
-    borderRadius: 15,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 16,
-    borderWidth: 1.5,
-    borderColor: colors.neonBlue,
-    backgroundColor: colors.neonBlue + '18',
-  },
-  rutaButtonText: {
-    color: colors.neonBlue,
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.2,
-  },
-  eventosButton: {
-    borderRadius: 15,
-    paddingVertical: 15,
-    alignItems: 'center',
-    marginTop: 12,
-    shadowColor: colors.brandPink,
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  eventosButtonText: {
-    color: '#ffffff',
-    fontSize: 15,
-    fontWeight: '800',
-    letterSpacing: 0.2,
   },
 });

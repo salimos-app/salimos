@@ -1,5 +1,6 @@
 const { Router } = require('express');
 const { fetchFromFourvenues, NINETY_DAYS_SECONDS } = require('../fourvenues');
+const { createCache } = require('../cache');
 
 const router = Router();
 
@@ -7,22 +8,7 @@ const router = Router();
 // coordenadas de un local no cambian de un minuto a otro, así que servirlas
 // desde aquí evita machacar a Fourvenues (y el rate-limiter propio) cada vez
 // que un cliente arranca. Solo se cachean respuestas correctas.
-const CACHE_TTL_MS = 10 * 60 * 1000;
-const cache = new Map();
-
-function readCache(key) {
-  const hit = cache.get(key);
-  if (!hit) return null;
-  if (Date.now() - hit.at > CACHE_TTL_MS) {
-    cache.delete(key);
-    return null;
-  }
-  return hit.value;
-}
-
-function writeCache(key, value) {
-  cache.set(key, { at: Date.now(), value });
-}
+const { read: readCache, write: writeCache } = createCache(10 * 60 * 1000);
 
 router.get('/:slug/metadata', async (req, res) => {
   const cacheKey = `metadata:${req.params.slug}`;
@@ -113,6 +99,32 @@ router.get('/:slug/events/:eventId/tickets-types', async (req, res) => {
     const { statusCode, body } = await fetchFromFourvenues(
       `/api/events/${req.params.eventId}/tickets-types?slug=${req.params.slug}`
     );
+    if (statusCode === 200) {
+      writeCache(cacheKey, body);
+    }
+    res.status(statusCode).type('application/json; charset=utf-8').send(body);
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
+});
+
+/**
+ * Detalle de un evento (Fourvenues `/api/events/:code`), para lo que no
+ * trae ya /events: código de vestimenta (`perch` en la respuesta real de
+ * Fourvenues, sin documentar oficialmente) y qué ofrece (`services`:
+ * "listas"/"entradas"/"reservados"). Necesita el `code` corto de 4
+ * caracteres (el de la URL pública), no el `id` interno.
+ */
+router.get('/:slug/events/:code/detail', async (req, res) => {
+  const cacheKey = `event-detail:${req.params.code}`;
+  const cached = readCache(cacheKey);
+  if (cached) {
+    res.type('application/json; charset=utf-8').send(cached);
+    return;
+  }
+
+  try {
+    const { statusCode, body } = await fetchFromFourvenues(`/api/events/${req.params.code}`);
     if (statusCode === 200) {
       writeCache(cacheKey, body);
     }

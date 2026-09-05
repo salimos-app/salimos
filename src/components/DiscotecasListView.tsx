@@ -85,7 +85,7 @@ export default function DiscotecasListView({
                 <View style={styles.discoInfo}>
                   <View style={styles.discoNombreRow}>
                     <Text style={styles.discoNombre} numberOfLines={1}>
-                      {discoteca.nombre}
+                      {discoteca.nombre} 
                     </Text>
                     {hasAlerts && <View style={styles.alertDot} />}
                   </View>

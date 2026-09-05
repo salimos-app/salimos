@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, BRAND_GRADIENT } from '../theme/colors';
@@ -8,26 +8,39 @@ function toJsonForScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
 }
 
+/** Id estable de un marcador de discoteca, para poder actualizarlo sin recrear el resto. */
+function markerId(marker: React.ReactElement<MarkerProps>, index: number): string {
+  return marker.props.discoteca?.slug ?? marker.props.title ?? String(index);
+}
+
+interface MarkerDatum {
+  id: string;
+  latitude: number;
+  longitude: number;
+  title: string;
+  color: string;
+  selected: boolean;
+  hasAlerts: boolean;
+  eventImage: string | null;
+}
+
+/**
+ * HTML/JS de MapLibre GL, construido UNA SOLA VEZ por montaje (ver
+ * `useMemo` más abajo). Los datos (marcadores, puntos, ruta) no se
+ * embeben aquí: llegan después vía `injectJavaScript`, a través de
+ * `window.updateMarkers/updatePoints/updateRoute`. Antes esta función se
+ * reconstruía en cada render con los datos embebidos y se pasaba como
+ * `source={{html}}` nuevo cada vez, lo que forzaba a WebView a recargar
+ * la página entera (reinicializar MapLibre, redescargar tiles, recrear
+ * todos los pines) por cada cambio de estado, por pequeño que fuera —
+ * grave en una app con alertas en vivo por WebSocket. Actualizar el mapa
+ * ya vivo, como aquí, es el mismo enfoque que ya usa `MapView.web.tsx`.
+ */
 function buildMapHtml({
   center,
-  markers,
-  route,
-  points,
   gradientStops,
 }: {
   center: { latitude: number; longitude: number };
-  markers: {
-    index: number;
-    latitude: number;
-    longitude: number;
-    title: string;
-    color: string;
-    selected: boolean;
-    hasAlerts: boolean;
-    eventImage: string | null;
-  }[];
-  route: [number, number][];
-  points: MapViewProps['points'];
   gradientStops: readonly string[];
 }): string {
   return `<!doctype html>
@@ -41,9 +54,6 @@ html,body,#map{height:100%;margin:0;background:${colors.background}}
 </style></head>
 <body><div id="map"></div><script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script><script>
 const mapStyle=${toJsonForScript(mapStyle)};
-const markers=${toJsonForScript(markers)};
-const route=${toJsonForScript(route)};
-const points=${toJsonForScript(points ?? [])};
 const gradientStops=${toJsonForScript(gradientStops)};
 const EVENT_PIN_WIDTH=100;
 const EVENT_PIN_POINTER_HEIGHT=10;
@@ -92,22 +102,41 @@ const map=new maplibregl.Map({container:'map',style:mapStyle,center:[${center.lo
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
 map.on('click',(e)=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map',lat:e.lngLat.lat,lng:e.lngLat.lng})));
 
-markers.forEach(item=>{
-  const el=document.createElement('div');
-  el.innerHTML=discotecaPinHtml(item);
-  const markerEl=el.firstElementChild;
-  markerEl.style.cursor='pointer';
-  markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',index:item.index}));});
-  new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([item.longitude,item.latitude]).addTo(map);
-});
+// Marcadores de discotecas: se actualizan uno a uno por id (comparando una
+// "firma" serializada de lo que se ve de cada uno). Solo se recrea el DOM
+// del pin cuyo aspecto cambió — el resto se queda tal cual, así que un
+// evento de alertas o una foto que llega no reconstruye pines que no
+// cambiaron.
+const markersById=new Map();
+function updateMarkers(items){
+  const seen=new Set();
+  items.forEach(item=>{
+    seen.add(item.id);
+    const firma=JSON.stringify(item);
+    const existente=markersById.get(item.id);
+    if(existente&&existente.firma===firma)return;
+    if(existente)existente.marker.remove();
+    const el=document.createElement('div');
+    el.innerHTML=discotecaPinHtml(item);
+    const markerEl=el.firstElementChild;
+    markerEl.style.cursor='pointer';
+    markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',id:item.id}));});
+    const marker=new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([item.longitude,item.latitude]).addTo(map);
+    markersById.set(item.id,{marker,firma});
+  });
+  markersById.forEach((entrada,id)=>{if(!seen.has(id)){entrada.marker.remove();markersById.delete(id);}});
+}
+window.updateMarkers=updateMarkers;
+
+let pointsById=new Map();
+let routeStartMarker=null;
 
 map.on('load',()=>{
-  map.addSource('salimos-points',{type:'geojson',cluster:true,clusterMaxZoom:16,clusterRadius:56,data:{type:'FeatureCollection',features:points.map(p=>({type:'Feature',properties:{id:p.id},geometry:{type:'Point',coordinates:[p.longitude,p.latitude]}}))}});
+  map.addSource('salimos-points',{type:'geojson',cluster:true,clusterMaxZoom:16,clusterRadius:56,data:{type:'FeatureCollection',features:[]}});
   map.addLayer({id:'salimos-points-clusters',type:'symbol',source:'salimos-points',filter:['has','point_count'],layout:{'icon-allow-overlap':true}});
 
   const clusterMarkers=new Map();
   const pointMarkers=new Map();
-  const pointsById=new Map(points.map(p=>[p.id,p]));
   function renderPoints(){
     const clusterFeatures=map.querySourceFeatures('salimos-points',{filter:['has','point_count']});
     const seenClusters=new Set();
@@ -153,9 +182,19 @@ map.on('load',()=>{
   }
   map.on('data',renderPoints);
   map.on('move',renderPoints);
-  renderPoints();
 
-  if(route.length>1){
+  window.updatePoints=function(points){
+    pointsById=new Map(points.map(p=>[p.id,p]));
+    map.getSource('salimos-points').setData({type:'FeatureCollection',features:points.map(p=>({type:'Feature',properties:{id:p.id},geometry:{type:'Point',coordinates:[p.longitude,p.latitude]}}))});
+  };
+
+  window.updateRoute=function(route){
+    if(map.getLayer('salimos-route-glow'))map.removeLayer('salimos-route-glow');
+    if(map.getLayer('salimos-route-line'))map.removeLayer('salimos-route-line');
+    if(map.getSource('salimos-route'))map.removeSource('salimos-route');
+    if(routeStartMarker){routeStartMarker.remove();routeStartMarker=null;}
+    if(!route||route.length<2)return;
+
     const coordinates=route.map(([lat,lng])=>[lng,lat]);
     map.addSource('salimos-route',{type:'geojson',lineMetrics:true,data:{type:'Feature',properties:{},geometry:{type:'LineString',coordinates}}});
     const gradient=['interpolate',['linear'],['line-progress']];
@@ -164,10 +203,12 @@ map.on('load',()=>{
     map.addLayer({id:'salimos-route-line',type:'line',source:'salimos-route',layout:{'line-cap':'round','line-join':'round'},paint:{'line-gradient':gradient,'line-width':5,'line-opacity':.95}});
     const start=document.createElement('div');
     start.style.cssText='width:14px;height:14px;border-radius:50%;background:${colors.brandPink};border:3px solid #ffffff;';
-    new maplibregl.Marker({element:start}).setLngLat(coordinates[0]).addTo(map);
+    routeStartMarker=new maplibregl.Marker({element:start}).setLngLat(coordinates[0]).addTo(map);
     const bounds=coordinates.reduce((b,c)=>b.extend(c),new maplibregl.LngLatBounds(coordinates[0],coordinates[0]));
     map.fitBounds(bounds,{padding:40});
-  }
+  };
+
+  window.ReactNativeWebView.postMessage(JSON.stringify({type:'ready'}));
 });
 </script></body></html>`;
 }
@@ -182,14 +223,18 @@ export function MapViewComponent({
   onPointPress,
   children,
 }: MapViewProps) {
+  const webviewRef = useRef<WebView>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const center = region || initialRegion;
+
   const markers = React.Children.toArray(children).filter(
     (child): child is React.ReactElement<MarkerProps> =>
       React.isValidElement(child) &&
       Boolean((child as React.ReactElement<MarkerProps>).props.coordinate),
   );
-  const center = region || initialRegion;
-  const markerData = markers.map((marker, index) => ({
-    index,
+
+  const markerData: MarkerDatum[] = markers.map((marker, index) => ({
+    id: markerId(marker, index),
     latitude: marker.props.coordinate.latitude,
     longitude: marker.props.coordinate.longitude,
     title: marker.props.title ?? 'Discoteca',
@@ -198,21 +243,54 @@ export function MapViewComponent({
     hasAlerts: Boolean(marker.props.hasAlerts),
     eventImage: marker.props.eventImage ?? null,
   }));
+  const markersKey = JSON.stringify(markerData);
 
-  const mapHtml = buildMapHtml({
-    center: {
-      latitude: center?.latitude ?? 36.5982,
-      longitude: center?.longitude ?? -6.2242,
-    },
-    markers: markerData,
-    route: routeCoordinates ?? [],
-    points,
-    gradientStops: BRAND_GRADIENT,
-  });
+  // El handler de cada pin se lee siempre por referencia (vía este mapa), no
+  // por índice: así identificar el marcador por `id` en el mensaje del
+  // WebView sigue funcionando aunque el orden de `children` cambie entre
+  // renders.
+  const markerPressRef = useRef<Map<string, () => void>>(new Map());
+  markerPressRef.current = new Map(
+    markers.map((marker, index) => [markerId(marker, index), () => marker.props.onPress?.()]),
+  );
+
+  // El HTML/JS del mapa se construye una única vez por montaje: no depende
+  // de los datos (ver comentario en `buildMapHtml`), solo del centro inicial.
+  const mapHtml = useMemo(
+    () =>
+      buildMapHtml({
+        center: {
+          latitude: center?.latitude ?? 36.5982,
+          longitude: center?.longitude ?? -6.2242,
+        },
+        gradientStops: BRAND_GRADIENT,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  useEffect(() => {
+    if (!mapReady) return;
+    webviewRef.current?.injectJavaScript(`window.updateMarkers(${toJsonForScript(markerData)});true;`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, markersKey]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    webviewRef.current?.injectJavaScript(`window.updatePoints(${toJsonForScript(points)});true;`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, points]);
+
+  useEffect(() => {
+    if (!mapReady) return;
+    webviewRef.current?.injectJavaScript(`window.updateRoute(${toJsonForScript(routeCoordinates ?? [])});true;`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, routeCoordinates]);
 
   return (
     <View style={[styles.container, style]}>
       <WebView
+        ref={webviewRef}
         style={styles.webview}
         originWhitelist={['*']}
         javaScriptEnabled
@@ -221,11 +299,10 @@ export function MapViewComponent({
         onMessage={(event) => {
           try {
             const message = JSON.parse(event.nativeEvent.data);
-            if (
-              message.type === 'marker' &&
-              markers[message.index]?.props.onPress
-            ) {
-              markers[message.index].props.onPress?.();
+            if (message.type === 'ready') {
+              setMapReady(true);
+            } else if (message.type === 'marker') {
+              markerPressRef.current.get(message.id)?.();
             } else if (message.type === 'point') {
               const point = points?.find((p) => p.id === message.id);
               if (point) onPointPress?.(point);

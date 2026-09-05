@@ -6,14 +6,16 @@ export interface FiltroOpcion {
   id: string;
   icon: string;
   label: string;
-  /** Color de acento cuando el filtro está activo (a juego con los pines del mapa). */
+  /** Color de acento de la burbuja, a juego con los pines del mapa. */
   color: string;
 }
 
 interface Props {
   opciones: FiltroOpcion[];
-  activos: Record<string, boolean>;
-  onToggle: (id: string) => void;
+  /** Se llama al tocar una burbuja (id de la categoría elegida). Cierra el abanico. */
+  onSelect: (id: string) => void;
+  /** Se llama al tocar el hub mientras el abanico ya está abierto (lo cierra). */
+  onCollapse: () => void;
 }
 
 const LOGO = require('../../assets/isotipo.png');
@@ -21,15 +23,19 @@ const LOGO = require('../../assets/isotipo.png');
 const HUB_SIZE = 96;
 const LOGO_SIZE = 62;
 const BUBBLE_SIZE = 52;
-const RADIO = 108;
+/** Distancia del centro del hub a la primera burbuja, y separación entre burbujas consecutivas. */
+const BASE_OFFSET = 78;
+const STEP = 66;
 
 /**
- * Sustituye a la vieja barra de filtros + cabecera "SALIMOS": ahora sólo hay
- * el logo dentro de un círculo gris, centrado arriba. Al tocarlo se despliega
- * y los filtros salen como pompas en abanico hacia abajo; cada pompa
- * muestra/oculta su categoría de marcadores en el mapa.
+ * El logo (un pin con forma de interrogación) hace de hub: al tocarlo la
+ * primera vez despliega las categorías en una columna recta hacia arriba
+ * (no en abanico). Tocar una categoría abre su listado/mejor opción
+ * (gestionado por el padre vía `onSelect`) y cierra el abanico. Tocar el
+ * hub de nuevo mientras está abierto lo cierra y dispara `onCollapse`
+ * (el padre usa esto para montar el plan de la noche).
  */
-export default function FiltrosBurbujas({ opciones, activos, onToggle }: Props) {
+export default function FiltrosBurbujas({ opciones, onSelect, onCollapse }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [progreso] = useState(() => new Animated.Value(0));
 
@@ -44,14 +50,23 @@ export default function FiltrosBurbujas({ opciones, activos, onToggle }: Props) 
     return () => anim.stop();
   }, [abierto, progreso]);
 
-  // Cada pompa sale en abanico hacia arriba (0 = recto hacia arriba), repartidas
-  // simétricamente según cuántos filtros haya (el hub va pegado abajo en medio).
-  const n = opciones.length;
-  const posiciones = opciones.map((_, i) => {
-    const t = n === 1 ? 0.5 : i / (n - 1);
-    const angulo = (-55 + 110 * t) * (Math.PI / 180);
-    return { dx: Math.sin(angulo) * RADIO, dy: -Math.cos(angulo) * RADIO };
-  });
+  // Columna recta hacia arriba: cada burbuja se apila directamente encima
+  // de la anterior (sin desplazamiento horizontal), la más cercana al hub
+  // primero.
+  const posiciones = opciones.map((_, i) => ({ dx: 0, dy: -(BASE_OFFSET + i * STEP) }));
+
+  const handleHubPress = () => {
+    setAbierto((previo) => {
+      const siguiente = !previo;
+      if (previo && !siguiente) onCollapse();
+      return siguiente;
+    });
+  };
+
+  const handleBubblePress = (id: string) => {
+    setAbierto(false);
+    onSelect(id);
+  };
 
   return (
     <View style={styles.capa} pointerEvents="box-none">
@@ -60,7 +75,6 @@ export default function FiltrosBurbujas({ opciones, activos, onToggle }: Props) 
       <View style={styles.ancla} pointerEvents="box-none">
         <View style={styles.hubWrap} pointerEvents="box-none">
           {opciones.map((opcion, i) => {
-            const activo = activos[opcion.id] ?? true;
             const { dx, dy } = posiciones[i];
             const translateX = progreso.interpolate({ inputRange: [0, 1], outputRange: [0, dx] });
             const translateY = progreso.interpolate({ inputRange: [0, 1], outputRange: [0, dy] });
@@ -74,20 +88,12 @@ export default function FiltrosBurbujas({ opciones, activos, onToggle }: Props) 
                 pointerEvents={abierto ? 'auto' : 'none'}
               >
                 <Pressable
-                  onPress={() => onToggle(opcion.id)}
-                  style={[
-                    styles.bubble,
-                    activo
-                      ? { backgroundColor: opcion.color + '26', borderColor: opcion.color }
-                      : styles.bubbleInactiva,
-                  ]}
+                  onPress={() => handleBubblePress(opcion.id)}
+                  style={[styles.bubble, { backgroundColor: opcion.color + '26', borderColor: opcion.color }]}
                 >
                   <Text style={styles.bubbleIcon}>{opcion.icon}</Text>
                 </Pressable>
-                <Text
-                  style={[styles.bubbleLabel, { color: activo ? opcion.color : colors.textMuted }]}
-                  numberOfLines={1}
-                >
+                <Text style={[styles.bubbleLabel, { color: opcion.color }]} numberOfLines={1}>
                   {opcion.label}
                 </Text>
               </Animated.View>
@@ -95,10 +101,10 @@ export default function FiltrosBurbujas({ opciones, activos, onToggle }: Props) 
           })}
 
           <Pressable
-            onPress={() => setAbierto((v) => !v)}
+            onPress={handleHubPress}
             style={styles.hub}
             accessibilityRole="button"
-            accessibilityLabel="Filtros del mapa"
+            accessibilityLabel="Menú de categorías"
           >
             <Image source={LOGO} style={styles.logo} resizeMode="contain" />
           </Pressable>
@@ -165,10 +171,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 4,
     elevation: 3,
-  },
-  bubbleInactiva: {
-    backgroundColor: colors.backgroundCard + 'F0',
-    borderColor: colors.border,
   },
   bubbleIcon: {
     fontSize: 20,
