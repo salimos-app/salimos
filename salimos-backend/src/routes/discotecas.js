@@ -1,11 +1,17 @@
 const { Router } = require('express');
-const { DISCOTECAS } = require('../discotecas/discotecas');
 const { getDb } = require('../db/client');
+const { discotecaFromRow } = require('../db/rowMappers');
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.json({ data: DISCOTECAS });
+router.get('/', async (req, res) => {
+  try {
+    const db = getDb();
+    const result = await db.execute('SELECT * FROM discotecas ORDER BY orden ASC');
+    res.json({ data: result.rows.map(discotecaFromRow) });
+  } catch (error) {
+    res.status(502).json({ error: error.message });
+  }
 });
 
 /**

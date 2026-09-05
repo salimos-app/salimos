@@ -52,25 +52,31 @@ function pinNameLabelHtml(item){
   return '<div style="max-width:132px;background:${colors.backgroundCard}F5;border:1px solid '+(sel?item.color:'${colors.borderLight}')+';border-radius:8px;padding:3px 8px;margin-bottom:3px;box-shadow:0 4px 10px rgba(0,0,0,.4)'+(sel?', 0 0 0 3px '+item.color+'40':'')+';">'
     +'<span style="display:block;color:#fff;font-size:10.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:-apple-system,system-ui,sans-serif;">'+item.title+'</span></div>';
 }
+// El div raíz que devuelve esta función es el que MapLibre posiciona
+// directamente (le reescribe el transform en cada frame para seguir el
+// mapa). Si ese mismo nodo tuviera además una transition de transform propia
+// (para el efecto de "seleccionado"), el navegador animaría también los
+// cambios de posición y el pin se quedaría a medio camino del mapa mientras
+// arrastras. Por eso el escalado va en un div interior aparte.
 function discotecaPinHtml(item){
   const initial=(item.title||'?').charAt(0).toUpperCase();
   const sel=!!item.selected;
   const alertBadge=item.hasAlerts?'<div style="position:absolute;top:-2px;left:-4px;width:15px;height:15px;border-radius:50%;background:${colors.warning};border:2px solid ${colors.background};box-shadow:0 0 0 1px rgba(0,0,0,.35);"></div>':'';
   if(item.eventImage){
-    const html='<div style="width:140px;display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.06:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
+    const html='<div style="width:140px;"><div style="display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.06:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
       +pinNameLabelHtml(item)
       +'<div style="position:relative;width:'+EVENT_PIN_WIDTH+'px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));">'
       +'<img src="'+item.eventImage+'" style="display:block;width:'+EVENT_PIN_WIDTH+'px;height:auto;border:3px solid '+(sel?'#ffffff':item.color)+';box-sizing:border-box;" />'
       +'<div style="width:0;height:0;margin:0 auto;border-left:8px solid transparent;border-right:8px solid transparent;border-top:'+EVENT_PIN_POINTER_HEIGHT+'px solid '+item.color+';"></div>'
-      +alertBadge+'</div></div>';
+      +alertBadge+'</div></div></div>';
     return html;
   }
-  const html='<div style="width:140px;display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.1:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
+  const html='<div style="width:140px;"><div style="display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.1:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
     +pinNameLabelHtml(item)
     +'<div style="position:relative;width:36px;height:42px;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));">'
     +'<svg width="36" height="42" viewBox="0 0 36 42"><path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z" fill="'+item.color+'" stroke="'+(sel?'#ffffff':'${colors.background}')+'" stroke-width="'+(sel?2.5:1.5)+'"/></svg>'
     +'<div style="position:absolute;top:8px;left:0;right:0;text-align:center;color:#fff;font-weight:800;font-size:14px;font-family:-apple-system,system-ui,sans-serif;text-shadow:0 1px 3px rgba(0,0,0,.45);">'+initial+'</div>'
-    +alertBadge+'</div></div>';
+    +alertBadge+'</div></div></div>';
   return html;
 }
 function clusterHtml(count){
@@ -100,7 +106,8 @@ map.on('load',()=>{
   map.addLayer({id:'salimos-points-clusters',type:'symbol',source:'salimos-points',filter:['has','point_count'],layout:{'icon-allow-overlap':true}});
 
   const clusterMarkers=new Map();
-  const pointMarkers=[];
+  const pointMarkers=new Map();
+  const pointsById=new Map(points.map(p=>[p.id,p]));
   function renderPoints(){
     const clusterFeatures=map.querySourceFeatures('salimos-points',{filter:['has','point_count']});
     const seenClusters=new Set();
@@ -123,23 +130,26 @@ map.on('load',()=>{
     });
     clusterMarkers.forEach((marker,id)=>{if(!seenClusters.has(id)){marker.remove();clusterMarkers.delete(id);}});
 
-    pointMarkers.forEach(m=>m.remove());
-    pointMarkers.length=0;
+    // Diferencial, como los clusters de arriba: recrear todos los pines aquí
+    // hacía que arrastrar el mapa reconstruyera su DOM en cada frame del
+    // gesto, y se veía a tirones.
     const singleFeatures=map.querySourceFeatures('salimos-points',{filter:['!',['has','point_count']]});
     const seenPoints=new Set();
     singleFeatures.forEach(f=>{
       const id=f.properties.id;
       if(seenPoints.has(id))return;
       seenPoints.add(id);
-      const point=points.find(p=>p.id===id);
+      if(pointMarkers.has(id))return;
+      const point=pointsById.get(id);
       if(!point)return;
       const el=document.createElement('div');
       el.innerHTML=simplePointHtml(point.icon,point.color);
       const markerEl=el.firstElementChild;
       markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:point.id}));});
       const marker=new maplibregl.Marker({element:markerEl}).setLngLat([point.longitude,point.latitude]).addTo(map);
-      pointMarkers.push(marker);
+      pointMarkers.set(id,marker);
     });
+    pointMarkers.forEach((marker,id)=>{if(!seenPoints.has(id)){marker.remove();pointMarkers.delete(id);}});
   }
   map.on('data',renderPoints);
   map.on('move',renderPoints);

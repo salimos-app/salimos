@@ -1,6 +1,12 @@
 import { Evento, Location, TicketType } from '../types/evento';
 import { DiscotecaSinColor } from '../types/discoteca';
 import { getApiBaseUrls } from '../config/api';
+import { fetchWithFallback } from './httpClient';
+
+/** Un array no vacío, o `undefined` para que `fetchWithFallback` siga probando URLs. */
+function nonEmpty<T>(list: T[]): T[] | undefined {
+  return list.length > 0 ? list : undefined;
+}
 
 function normalizeEventos(payload: unknown): Evento[] {
   if (typeof payload !== 'object' || payload === null) {
@@ -110,31 +116,21 @@ function normalizeEventosConImagen(payload: unknown): Evento[] {
 }
 
 /**
- * Obtiene el listado de discotecas de El Puerto de Santa María que conoce el
- * backend (`salimos-backend/src/discotecas/discotecas.js`), en vez de tener
- * la lista hardcodeada en el bundle de la app.
+ * Obtiene el listado de discotecas que conoce el backend (`GET /api/discotecas`),
+ * en vez de tener la lista hardcodeada en el bundle de la app.
  */
 export async function fetchDiscotecas(): Promise<DiscotecaSinColor[]> {
   const urls = getApiBaseUrls().map((baseUrl) => `${baseUrl}/api/discotecas`);
-  let lastError: unknown = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      if (Array.isArray(payload?.data) && payload.data.length > 0) {
-        return payload.data as DiscotecaSinColor[];
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando discotecas desde ${url}:`, error);
-    }
-  }
-
-  throw lastError ?? new Error('No se pudo cargar el listado de discotecas.');
+  return fetchWithFallback(
+    urls,
+    (payload) => {
+      const data = (payload as { data?: unknown })?.data;
+      return Array.isArray(data)
+        ? nonEmpty(data as DiscotecaSinColor[])
+        : undefined;
+    },
+    { label: 'discotecas' },
+  );
 }
 
 export interface DiscotecaCoordinates {
@@ -144,12 +140,6 @@ export interface DiscotecaCoordinates {
   direccion: string;
 }
 
-/**
- * Obtiene las URLs de metadata de microsites según la plataforma y entorno.
- * Ejemplos:
- *  - Local:  http://localhost:8082/api/microsites/banana/metadata
- *  - Render: https://backend-salimos.onrender.com/api/microsites/banana/metadata
- */
 function getMetadataUrls(slug: string): string[] {
   return getApiBaseUrls().map(
     (baseUrl) => `${baseUrl}/api/microsites/${slug}/metadata`,
@@ -164,44 +154,35 @@ function getEventsUrls(slug: string): string[] {
 
 /**
  * Obtiene las coordenadas de una discoteca desde la API.
- * @param slug Identificador del microsite (ej: "banana")
+ * @param slug Identificador del microsite en Fourvenues
  */
 export async function fetchDiscotecaCoordinates(
   slug: string,
 ): Promise<DiscotecaCoordinates> {
-  const urls = getMetadataUrls(slug);
-  let lastError: unknown = null;
+  return fetchWithFallback(
+    getMetadataUrls(slug),
+    (payload) => {
+      const p = payload as Record<string, unknown>;
+      // Extrae las coordenadas del primer evento (todos tienen la misma ubicación).
+      const data = p?.data as Record<string, unknown> | undefined;
+      const itemListElement =
+        (data?.itemListElement as unknown[] | undefined) ??
+        (p?.itemListElement as unknown[] | undefined);
+      const firstItem = (itemListElement?.[0] as Record<string, unknown> | undefined)
+        ?.item as Record<string, unknown> | undefined;
+      const location = firstItem?.location as Record<string, unknown> | undefined;
+      const geo = location?.geo as { latitude?: number; longitude?: number } | undefined;
+      if (!geo) return undefined;
 
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = await response.json();
-
-      // Extrae las coordenadas del primer evento (todos tienen la misma ubicación)
-      const firstItem =
-        payload?.data?.itemListElement?.[0]?.item ||
-        payload?.itemListElement?.[0]?.item;
-      if (firstItem?.location?.geo) {
-        return {
-          latitude: firstItem.location.geo.latitude,
-          longitude: firstItem.location.geo.longitude,
-          nombre: firstItem.location.name,
-          direccion: firstItem.location.address?.streetAddress || '',
-        };
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando coordenadas desde ${url}:`, error);
-    }
-  }
-
-  throw (
-    lastError ?? new Error('No se pudo cargar las coordenadas de la discoteca.')
+      const address = location?.address as { streetAddress?: string } | undefined;
+      return {
+        latitude: geo.latitude as number,
+        longitude: geo.longitude as number,
+        nombre: location?.name as string,
+        direccion: address?.streetAddress || '',
+      };
+    },
+    { label: 'coordenadas de la discoteca' },
   );
 }
 
@@ -210,71 +191,40 @@ export async function fetchDiscotecaCoordinates(
  * contra /events, sin el fallback a /metadata de `fetchProximosEventos`:
  * al arrancar solo interesa la foto para el pin, y /metadata nunca trae
  * imágenes, así que ese fallback solo sumaría peticiones inútiles.
- * @param slug Identificador del microsite (ej: "banana")
+ * @param slug Identificador del microsite en Fourvenues
  */
 export async function fetchEventImage(slug: string): Promise<string | null> {
-  for (const url of getEventsUrls(slug)) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const payload = await response.json();
-      const eventos = normalizeEventosConImagen(payload);
-      const conFoto = eventos.find((evento) => evento.image)?.image;
-      if (conFoto) return conFoto;
-    } catch (error) {
-      console.warn(`Sin foto de evento para ${slug} (se usa la imagen genérica):`, error);
-    }
-  }
-  return null;
+  return fetchWithFallback(
+    getEventsUrls(slug),
+    (payload) => normalizeEventosConImagen(payload).find((evento) => evento.image)?.image,
+    { label: `foto de evento (${slug})`, fallbackValue: null },
+  );
 }
 
 /**
  * Obtiene los próximos eventos de una discoteca, con foto cuando Fourvenues
  * la tenga cargada (a diferencia de /metadata, que es solo el feed schema.org
- * sin imágenes).
- * @param slug Identificador del microsite (ej: "banana")
+ * sin imágenes). Si /events falla del todo, cae a /metadata (sin fotos).
+ * @param slug Identificador del microsite en Fourvenues
  */
 export async function fetchProximosEventos(slug: string): Promise<Evento[]> {
-  const urls = getEventsUrls(slug);
-  let lastError: unknown = null;
-
-  for (const url of urls) {
+  try {
+    return await fetchWithFallback(
+      getEventsUrls(slug),
+      (payload) => nonEmpty(normalizeEventosConImagen(payload)),
+      { label: `eventos (${slug})` },
+    );
+  } catch (error) {
     try {
-      const response = await fetch(url);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const payload = await response.json();
-      const eventos = normalizeEventosConImagen(payload);
-
-      if (eventos.length > 0) {
-        return eventos;
-      }
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando eventos desde ${url}:`, error);
+      return await fetchWithFallback(
+        getMetadataUrls(slug),
+        (payload) => nonEmpty(normalizeEventos(payload)),
+        { label: `eventos, fallback a metadata (${slug})` },
+      );
+    } catch {
+      throw error;
     }
   }
-
-  // Fallback: si /events falla, al menos se listan los eventos sin foto.
-  const metadataUrls = getMetadataUrls(slug);
-  for (const url of metadataUrls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) continue;
-      const payload = await response.json();
-      const eventos = normalizeEventos(payload);
-      if (eventos.length > 0) {
-        return eventos;
-      }
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError ?? new Error('No se pudo cargar la lista de eventos.');
 }
 
 function normalizeTicketTypes(payload: unknown): TicketType[] {
@@ -314,7 +264,7 @@ function normalizeTicketTypes(payload: unknown): TicketType[] {
  * Tipos de entrada y precios de un evento concreto (tramos, disponibilidad).
  * Necesita `eventId` (el `id` que trae `fetchProximosEventos`, no el `code`
  * corto de la URL pública) porque Fourvenues indexa los precios por ahí.
- * @param slug Identificador del microsite (ej: "banana")
+ * @param slug Identificador del microsite en Fourvenues
  * @param eventId Id interno del evento (`Evento.id`)
  */
 export async function fetchEventTicketTypes(
@@ -324,23 +274,9 @@ export async function fetchEventTicketTypes(
   const urls = getApiBaseUrls().map(
     (baseUrl) => `${baseUrl}/api/microsites/${slug}/events/${eventId}/tickets-types`,
   );
-  let lastError: unknown = null;
-
-  for (const url of urls) {
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const payload = await response.json();
-      return normalizeTicketTypes(payload);
-    } catch (error) {
-      lastError = error;
-      console.warn(`Fallo cargando precios de entradas desde ${url}:`, error);
-    }
-  }
-
-  throw lastError ?? new Error('No se pudieron cargar los precios de las entradas.');
+  return fetchWithFallback(urls, normalizeTicketTypes, {
+    label: 'precios de entradas',
+  });
 }
 
 /** Precio más barato disponible entre los tipos de entrada de un evento, o `null` si no hay ninguno a la venta. */
