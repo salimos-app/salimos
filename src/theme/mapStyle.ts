@@ -28,7 +28,7 @@ const sources = {
  */
 /** Colores propios del mapa (terreno y agua), independientes del tema de la UI. */
 const MAP_TERRAIN_COLOR = '#060711';
-const MAP_WATER_COLOR = '#041C3E';
+const MAP_WATER_COLOR = '#0D0B1E';
 
 const layers = [
   {
@@ -98,14 +98,18 @@ const layers = [
     },
   },
   {
+    // AUTOPISTA
     id: 'road-motorway',
     type: 'line',
     source: 'openmaptiles',
     'source-layer': 'transportation',
     filter: ['==', 'class', 'motorway'],
     paint: {
-      'line-color': colors.neonPurple,
+      // COLOR
+      'line-color': colors.border,
+      // OPACIDAD
       'line-opacity': 0.5,
+      // GROSOR
       'line-width': ['interpolate', ['linear'], ['zoom'], 6, 1, 18, 8],
     },
   },
