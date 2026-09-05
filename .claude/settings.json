@@ -4,5 +4,8 @@
     "code-simplifier@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
     "browser-use@claude-plugins-official": true
+  },
+  "worktree": {
+    "bgIsolation": "none"
   }
 }
