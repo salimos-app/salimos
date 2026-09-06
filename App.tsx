@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native';
+import { Image, Platform, StyleSheet, TouchableOpacity, View, ActivityIndicator } from 'react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import { useFonts } from 'expo-font';
+import { BlurView } from 'expo-blur';
+import { captureRef } from 'react-native-view-shot';
 import Text from './src/components/Text';
 import { colors } from './src/theme/colors';
 import { CATEGORY_COLORS } from './src/theme/categoryColors';
@@ -187,6 +189,29 @@ export default function App() {
   // Desenfoca el mapa mientras el desplegable del hub está abierto (ver
   // FiltrosBurbujas.onOpenChange y MapViewProps.blurred).
   const [hubAbierto, setHubAbierto] = useState(false);
+  // Android no puede blurear en vivo el WebView del mapa (limitación del
+  // sistema: no ve contenido de SurfaceView/WebView, sea cual sea el SDK de
+  // mapas — le pasa lo mismo a Google Maps o Mapbox nativos). Solución:
+  // capturar el mapa como imagen apenas se abre el hub y blurear ESA
+  // imagen (una `Image` normal sí participa del blur). Sin efecto en
+  // iOS/web, que ya bluréan el mapa real (ver MapViewProps.blurred).
+  const mapContainerRef = useRef<View>(null);
+  const [mapSnapshotUri, setMapSnapshotUri] = useState<string | null>(null);
+
+  const handleHubOpenChange = async (abierto: boolean) => {
+    setHubAbierto(abierto);
+    if (!abierto) {
+      setMapSnapshotUri(null);
+      return;
+    }
+    if (Platform.OS !== 'android' || viewMode !== 'map' || !mapContainerRef.current) return;
+    try {
+      const uri = await captureRef(mapContainerRef, { format: 'jpg', quality: 0.8 });
+      setMapSnapshotUri(uri);
+    } catch {
+      // Sin snapshot: el mapa se queda solo oscurecido, sin blur (mejor que romper la apertura del hub).
+    }
+  };
   // Categoría cuyo listado por cercanía está abierto (al tocar una burbuja
   // que no sea "discotecas": esa se resuelve directo a la mejor valorada,
   // ver `handleBubbleSelect`).
@@ -465,7 +490,7 @@ export default function App() {
     <View style={styles.container}>
       <StatusBar style="light" />
 
-      <View style={styles.mapContainer}>
+      <View style={styles.mapContainer} ref={mapContainerRef} collapsable={false}>
         {viewMode === 'map' ? (
           <MapViewComponent
             style={styles.map}
@@ -520,6 +545,12 @@ export default function App() {
             onSelectPoint={handlePointPress}
           />
         )}
+        {Platform.OS === 'android' && mapSnapshotUri && (
+          <View style={styles.mapSnapshotOverlay} pointerEvents="none">
+            <Image source={{ uri: mapSnapshotUri }} style={styles.mapSnapshotImage} resizeMode="cover" />
+            <BlurView intensity={40} tint="dark" style={styles.mapSnapshotBlur} />
+          </View>
+        )}
       </View>
 
       <View style={styles.viewToggle}>
@@ -549,7 +580,7 @@ export default function App() {
         opciones={FILTROS}
         onSelect={handleBubbleSelect}
         onCollapse={handleHubCollapse}
-        onOpenChange={setHubAbierto}
+        onOpenChange={handleHubOpenChange}
       />
 
       {categoriaOverlay && (
@@ -619,6 +650,27 @@ const styles = StyleSheet.create({
   },
   map: {
     flex: 1,
+  },
+  mapSnapshotOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mapSnapshotImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  mapSnapshotBlur: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   viewToggle: {
     position: 'absolute',
