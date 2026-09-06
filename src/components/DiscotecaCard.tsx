@@ -1,28 +1,23 @@
 import React from 'react';
-import {
-  View,
-  Image,
-  TouchableOpacity,
-  ScrollView,
-  StyleSheet,
-  Dimensions,
-} from 'react-native';
-import Text from './Text';
+import { View, Image, StyleSheet, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { colors, gradients } from '../theme/colors';
+import { colors } from '../theme/colors';
 import { Discoteca } from '../types/discoteca';
-import { Evento, EventoDetalle } from '../types/evento';
+import { Evento } from '../types/evento';
 import { RouteResult, TravelProfile } from '../services/directionsApi';
-import { formatFechaLarga } from '../utils/format';
-import AlertsPanel from './AlertsPanel';
-import RoutePanel from './RoutePanel';
+import EventoCarousel from './EventoCarousel';
+// Ocultada a petición la parte de info de la discoteca (ver bloque comentado
+// en el render): estos imports vuelven a hacer falta al restaurarla.
+// import { ScrollView, TouchableOpacity } from 'react-native';
+// import Text from './Text';
+// import { gradients } from '../theme/colors';
+// import AlertsPanel from './AlertsPanel';
+// import RoutePanel from './RoutePanel';
 
 interface Props {
   discoteca: Discoteca;
   /** Próximo evento con foto, o `null` si no tiene (cae al diseño genérico de la foto del local). */
   nextEvento: Evento | null;
-  /** Precio y detalle del evento (código de vestimenta, qué ofrece), pedidos aparte y más lentos que `nextEvento`. */
-  eventoExtra: { precio: number | null; detalle: EventoDetalle } | null;
   route: RouteResult | null;
   routeLoading: boolean;
   routeError: string | null;
@@ -33,69 +28,40 @@ interface Props {
 }
 
 /**
- * Tarjeta que aparece al tocar una discoteca (en el mapa o en la lista). Si
- * tiene un próximo evento con foto, esa foto ES la cabecera (a su diseño de
- * cartel, sin recortar) con la fecha/nombre/tags del evento debajo; si no,
- * cae a la foto genérica del local. El resto (nombre, valoración,
- * dirección, alertas en vivo, ruta) es siempre igual.
+ * Tarjeta que aparece al tocar una discoteca (en el mapa o en la lista).
  *
- * El flyer va fijo fuera del scroll a propósito: es lo más importante
- * visualmente y nunca debe recortarse; si el resto del contenido no cabe en
- * pantalla, es ese contenido el que hace scroll (ver `maxHeight` en
- * `styles.card`).
+ * Ahora mismo la tarjeta es SOLO el carrusel de carteles de eventos
+ * (`EventoCarousel`, uno por evento, deslizable en horizontal); si la
+ * discoteca no tiene eventos, cae a la foto genérica del local.
+ *
+ * Toda la parte de info de la discoteca (nombre, valoración, dirección,
+ * tags, alertas en vivo, panel de ruta y botones de "planificar ruta" /
+ * "ver próximos eventos") está oculta a petición — el bloque sigue abajo,
+ * comentado, junto con sus imports y props, para poder restaurarlo.
  */
-export default function DiscotecaCard({
-  discoteca,
-  nextEvento,
-  eventoExtra,
-  route,
-  routeLoading,
-  routeError,
-  onSelectRouteProfile,
-  onClearRoute,
-  onPlanificarRuta,
-  onVerEventos,
-}: Props) {
+export default function DiscotecaCard({ discoteca, nextEvento }: Props) {
   return (
     <View style={styles.card}>
       {nextEvento ? (
-        <Image source={{ uri: nextEvento.image }} style={styles.eventoFlyer} resizeMode="cover" />
+        <EventoCarousel slug={discoteca.slug} seedEvento={nextEvento} />
       ) : (
         <View style={styles.imageWrap}>
           <Image source={{ uri: discoteca.imagen }} style={styles.image} />
-          <LinearGradient colors={['transparent', colors.backgroundCard]} style={styles.imageFade} pointerEvents="none" />
+          <LinearGradient
+            colors={['transparent', colors.backgroundCard]}
+            style={styles.imageFade}
+            pointerEvents="none"
+          />
         </View>
       )}
 
-      <ScrollView contentContainerStyle={styles.cardContent} showsVerticalScrollIndicator={false}>
-        {nextEvento && (
-          <View style={styles.eventoDestacado}>
-            <Text variant="label" style={styles.eventoDestacadoFecha}>{formatFechaLarga(nextEvento.startDate)}</Text>
-            <Text variant="heading" style={styles.eventoDestacadoNombre} numberOfLines={2}>
-              {nextEvento.name}
-            </Text>
-            <View style={styles.tags}>
-              {nextEvento.age != null && (
-                <View style={[styles.tag, { backgroundColor: colors.neonYellow + '1F', borderColor: colors.neonYellow + '55' }]}>
-                  <Text variant="caption" style={{ color: colors.neonYellow }}>🔞 +{nextEvento.age}</Text>
-                </View>
-              )}
-              {eventoExtra?.detalle.dressCode && (
-                <View style={[styles.tag, { backgroundColor: colors.neonBlue + '1F', borderColor: colors.neonBlue + '55' }]}>
-                  <Text variant="caption" style={{ color: colors.neonBlue }}>
-                    👔 {eventoExtra.detalle.dressCode.charAt(0).toUpperCase() + eventoExtra.detalle.dressCode.slice(1)}
-                  </Text>
-                </View>
-              )}
-              {eventoExtra?.precio != null && (
-                <View style={[styles.tag, { backgroundColor: colors.neonGreen + '1F', borderColor: colors.neonGreen + '55' }]}>
-                  <Text variant="caption" style={{ color: colors.neonGreen }}>💶 {eventoExtra.precio}€</Text>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
+      {/* --- Info de la discoteca (oculta a petición). Para restaurarla:
+          descomentar este bloque, los imports de arriba y las props en la
+          firma de la función (`route`, `routeLoading`, `routeError`,
+          `onSelectRouteProfile`, `onClearRoute`, `onPlanificarRuta`,
+          `onVerEventos`).
 
+      <ScrollView contentContainerStyle={styles.cardContent} showsVerticalScrollIndicator={false}>
         <AlertsPanel slug={discoteca.slug} />
 
         <View style={styles.divider} />
@@ -149,6 +115,8 @@ export default function DiscotecaCard({
           </LinearGradient>
         </TouchableOpacity>
       </ScrollView>
+
+      --- fin bloque oculto */}
     </View>
   );
 }
@@ -163,7 +131,7 @@ const styles = StyleSheet.create({
     // importante); si el resto del contenido no cabe, hace scroll dentro
     // de la tarjeta en vez de cortarse contra el borde de la pantalla.
     maxHeight: Dimensions.get('window').height * 0.78,
-    backgroundColor: colors.backgroundCard,
+    backgroundColor: colors.background,
     borderRadius: 22,
     overflow: 'hidden',
     borderWidth: 1,
@@ -188,29 +156,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: 36,
   },
-  // El flyer del evento se muestra a su propio diseño (cartel completo, sin
-  // recortar ni desvanecer con gradiente): por eso va bastante más alto que
-  // la foto genérica del local y la info (fecha, nombre, tags) se lee
-  // debajo, no superpuesta.
-  eventoFlyer: {
-    width: '100%',
-    height: 260,
-    backgroundColor: colors.backgroundLight,
-  },
   cardContent: {
     padding: 18,
-  },
-  eventoDestacado: {
-    marginBottom: 4,
-  },
-  eventoDestacadoFecha: {
-    color: colors.textMuted,
-  },
-  eventoDestacadoNombre: {
-    color: colors.textPrimary,
-    marginTop: 2,
-    marginBottom: 12,
-    letterSpacing: 0.2,
   },
   cardHeader: {
     flexDirection: 'row',

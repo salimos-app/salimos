@@ -22,15 +22,12 @@ import { useAlertsForSlugs } from './src/hooks/useDiscotecaAlerts';
 import {
   fetchDiscotecas,
   fetchNextEvento,
-  fetchEventTicketTypes,
-  fetchEventDetail,
-  precioDesde,
   DiscotecaCoordinates,
 } from './src/services/eventosApi';
 import { fetchSitios, fetchParadasTaxi } from './src/services/lugaresApi';
 import { Sitio, SitioCategoria } from './src/types/sitio';
 import { ParadaTaxi } from './src/types/taxi';
-import { Evento, EventoDetalle } from './src/types/evento';
+import { Evento } from './src/types/evento';
 import { SITIO_ESTILO } from './src/utils/sitioEstilo';
 import { getCurrentLocation } from './src/services/location';
 import { LatLng } from './src/services/directionsApi';
@@ -251,32 +248,9 @@ export default function App() {
     };
   }, [discotecas]);
 
-  // Precio y detalle (código de vestimenta, qué ofrece) del evento de la
-  // discoteca seleccionada: a diferencia de la foto, esto solo interesa
-  // para la que está abierta en este momento, así que se pide aparte (no
-  // para las demás discotecas del mapa).
-  const [eventoExtra, setEventoExtra] = useState<{ precio: number | null; detalle: EventoDetalle } | null>(null);
-
-  useEffect(() => {
-    setEventoExtra(null);
-    if (!selectedClub || !nextEvento) return;
-    let mounted = true;
-
-    Promise.allSettled([
-      nextEvento.id ? fetchEventTicketTypes(selectedClub.slug, nextEvento.id) : Promise.resolve([]),
-      nextEvento.code ? fetchEventDetail(selectedClub.slug, nextEvento.code) : Promise.resolve({}),
-    ]).then(([precios, detalle]) => {
-      if (!mounted) return;
-      setEventoExtra({
-        precio: precios.status === 'fulfilled' ? precioDesde(precios.value) : null,
-        detalle: detalle.status === 'fulfilled' ? detalle.value : {},
-      });
-    });
-
-    return () => {
-      mounted = false;
-    };
-  }, [selectedClub, nextEvento]);
+  // El precio y el detalle (código de vestimenta) del evento los pide ahora
+  // `EventoCarousel` por su cuenta, por página visible del carrusel — la
+  // tarjeta ya no necesita precargarlos aquí.
 
   // Ya no hay filtro on/off: las burbujas del hub abren un listado o
   // seleccionan la mejor discoteca (ver handleBubbleSelect), así que todas
@@ -576,7 +550,6 @@ export default function App() {
         <DiscotecaCard
           discoteca={selectedClub}
           nextEvento={nextEvento}
-          eventoExtra={eventoExtra}
           route={route}
           routeLoading={routeLoading}
           routeError={routeError}
