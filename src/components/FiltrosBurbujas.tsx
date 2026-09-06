@@ -40,12 +40,11 @@ const SCRIM_COLOR = colors.background;
 const SCRIM_MAX_OPACITY = 0.6;
 const SCRIM_BLUR_INTENSITY = 100;
 
-// Hub (el pin central con el logo).
+// Hub (el pin central con el logo). Sin círculo de fondo: el isotipo ya tiene
+// forma de pin, así que es el hub por sí solo. El logo llena todo el área
+// tocable — su tamaño es el diámetro que tenía el círculo eliminado.
 const HUB_SIZE = 96;
-const HUB_BORDER_WIDTH = 3;
-/** Opacidad del fondo del hub, sufijo hex de alpha. */
-const HUB_BACKGROUND_ALPHA = 'F5';
-const LOGO_SIZE = 62;
+const LOGO_SIZE = HUB_SIZE;
 
 // DEBUG: botones del desplegable (taxi/súper/bar/discoteca) — todo este
 // bloque sigue en iteración, ninguno de estos valores está cerrado todavía
@@ -223,17 +222,8 @@ const styles = StyleSheet.create({
   hub: {
     width: HUB_SIZE,
     height: HUB_SIZE,
-    borderRadius: HUB_SIZE / 2,
-    borderWidth: HUB_BORDER_WIDTH,
-    borderColor: colors.border,
-    backgroundColor: colors.background + HUB_BACKGROUND_ALPHA,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
   },
   logo: {
     width: LOGO_SIZE,
