@@ -46,6 +46,14 @@ const SCRIM_BLUR_INTENSITY = 100;
 const HUB_SIZE = 96;
 const LOGO_SIZE = HUB_SIZE;
 
+// Feedback táctil del hub al pulsarlo: encoge mientras se mantiene el dedo y
+// rebota al soltar (muelle). Sólo `transform` → corre en el hilo nativo
+// (useNativeDriver) y se siente instantáneo en móvil.
+const HUB_PRESS_SCALE = 0.86;
+const HUB_PRESS_IN_MS = 90;
+const HUB_PRESS_OUT_FRICTION = 4;
+const HUB_PRESS_OUT_TENSION = 160;
+
 // DEBUG: botones del desplegable (taxi/súper/bar/discoteca) — todo este
 // bloque sigue en iteración, ninguno de estos valores está cerrado todavía
 // (ver CLAUDE.md → Decisiones de diseño → "Botones del hub").
@@ -95,6 +103,7 @@ const STEP = 50;
 export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpenChange }: Props) {
   const [abierto, setAbierto] = useState(false);
   const [progreso] = useState(() => new Animated.Value(0));
+  const [hubEscala] = useState(() => new Animated.Value(1));
 
   useEffect(() => {
     onOpenChange?.(abierto);
@@ -123,6 +132,24 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
       if (previo && !siguiente) onCollapse();
       return siguiente;
     });
+  };
+
+  const handleHubPressIn = () => {
+    Animated.timing(hubEscala, {
+      toValue: HUB_PRESS_SCALE,
+      duration: HUB_PRESS_IN_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleHubPressOut = () => {
+    Animated.spring(hubEscala, {
+      toValue: 1,
+      friction: HUB_PRESS_OUT_FRICTION,
+      tension: HUB_PRESS_OUT_TENSION,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleBubblePress = (id: string) => {
@@ -173,11 +200,15 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
 
           <Pressable
             onPress={handleHubPress}
+            onPressIn={handleHubPressIn}
+            onPressOut={handleHubPressOut}
             style={styles.hub}
             accessibilityRole="button"
             accessibilityLabel="Menú de categorías"
           >
-            <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+            <Animated.View style={{ transform: [{ scale: hubEscala }] }}>
+              <Image source={LOGO} style={styles.logo} resizeMode="contain" />
+            </Animated.View>
           </Pressable>
         </View>
       </View>
