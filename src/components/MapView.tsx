@@ -2,17 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { colors, BRAND_GRADIENT } from '../theme/colors';
+import { MAP_FONT_STYLESHEET_URL } from '../theme/mapPins';
+import { CATEGORY_COLORS } from '../theme/categoryColors';
 import {
-  MAP_FONT_FAMILY,
-  MAP_FONT_STYLESHEET_URL,
-  PIN_ACCENT_FONT_WEIGHT,
-  PIN_FILL_ALPHA,
-  PIN_ICON_COLOR,
-  PIN_ICON_DROP_SHADOW,
-  PIN_LABEL_FONT_WEIGHT,
-} from '../theme/mapPins';
-import { PIN_ICON_PATHS, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
-import { mapStyle, MarkerProps, MapViewProps } from './MapView.types';
+  CLUSTER_SIZE_THRESHOLDS,
+  clusterPinHtml,
+  discotecaPinHtml,
+  pointPinHtml,
+} from '../theme/mapPinHtml';
+import { mapStyle, MarkerProps, MapViewProps, SimpleMapPoint } from './MapView.types';
 
 function toJsonForScript(value: unknown): string {
   return JSON.stringify(value).replace(/</g, '\\u003c');
@@ -27,11 +25,26 @@ interface MarkerDatum {
   id: string;
   latitude: number;
   longitude: number;
-  title: string;
-  color: string;
-  selected: boolean;
-  hasAlerts: boolean;
-  eventImage: string | null;
+  /** HTML del pin ya construido (`mapPinHtml.ts`): el WebView solo lo inserta. */
+  html: string;
+}
+
+/** Marcador de posición del número dentro de las plantillas de cluster. */
+const CLUSTER_COUNT_PLACEHOLDER = '{{count}}';
+
+/**
+ * Plantillas del pin de punto, deduplicadas: los puntos de una misma
+ * categoría comparten HTML, así que se manda una vez por categoría y cada
+ * punto solo lleva su clave.
+ */
+function pointPinTemplates(points: SimpleMapPoint[]) {
+  const templates: Record<string, string> = {};
+  const items = points.map((point) => {
+    const pinKey = `${point.kind ?? ''}|${point.icon ?? ''}|${point.color ?? ''}`;
+    templates[pinKey] ??= pointPinHtml(point.kind, point.icon, point.color);
+    return { ...point, pinKey };
+  });
+  return { items, templates };
 }
 
 /**
@@ -59,59 +72,16 @@ function buildMapHtml({
 <link rel="stylesheet" href="${MAP_FONT_STYLESHEET_URL}">
 <style>
 html,body,#map{height:100%;margin:0;background:${colors.background}}
-.simple-point{width:30px;height:30px;border-radius:50%;border:2.5px solid ${colors.background};box-shadow:0 0 0 1.5px rgba(255,255,255,.55),0 6px 14px rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;font-size:14px}
 .maplibregl-ctrl-attrib{background:${colors.background}CC !important;color:${colors.textSecondary} !important}
 .maplibregl-ctrl-attrib a{color:${colors.neonPink} !important}
 </style></head>
 <body><div id="map"></div><script src="https://unpkg.com/maplibre-gl@4/dist/maplibre-gl.js"></script><script>
 const mapStyle=${toJsonForScript(mapStyle)};
 const gradientStops=${toJsonForScript(gradientStops)};
-const pinIconPaths=${toJsonForScript(PIN_ICON_PATHS)};
-const EVENT_PIN_WIDTH=100;
-const EVENT_PIN_POINTER_HEIGHT=10;
-function pinNameLabelHtml(item){
-  const sel=!!item.selected;
-  return '<div style="max-width:132px;background:${colors.backgroundCard}F5;border:1px solid '+(sel?item.color:'${colors.borderLight}')+';border-radius:8px;padding:3px 8px;margin-bottom:3px;box-shadow:0 4px 10px rgba(0,0,0,.4)'+(sel?', 0 0 0 3px '+item.color+'40':'')+';">'
-    +'<span style="display:block;color:#fff;font-size:10.5px;font-weight:${PIN_LABEL_FONT_WEIGHT};letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:${MAP_FONT_FAMILY};">'+item.title+'</span></div>';
-}
-// El div raíz que devuelve esta función es el que MapLibre posiciona
-// directamente (le reescribe el transform en cada frame para seguir el
-// mapa). Si ese mismo nodo tuviera además una transition de transform propia
-// (para el efecto de "seleccionado"), el navegador animaría también los
-// cambios de posición y el pin se quedaría a medio camino del mapa mientras
-// arrastras. Por eso el escalado va en un div interior aparte.
-function discotecaPinHtml(item){
-  const sel=!!item.selected;
-  const alertBadge=item.hasAlerts?'<div style="position:absolute;top:-2px;left:-4px;width:15px;height:15px;border-radius:50%;background:${colors.warning};border:2px solid ${colors.background};box-shadow:0 0 0 1px rgba(0,0,0,.35);"></div>':'';
-  if(item.eventImage){
-    const html='<div style="width:140px;"><div style="display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.06:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
-      +pinNameLabelHtml(item)
-      +'<div style="position:relative;width:'+EVENT_PIN_WIDTH+'px;filter:drop-shadow(0 6px 10px rgba(0,0,0,.5));">'
-      +'<img src="'+item.eventImage+'" style="display:block;width:'+EVENT_PIN_WIDTH+'px;height:auto;border:3px solid '+(sel?'#ffffff':item.color)+';box-sizing:border-box;" />'
-      +'<div style="width:0;height:0;margin:0 auto;border-left:8px solid transparent;border-right:8px solid transparent;border-top:'+EVENT_PIN_POINTER_HEIGHT+'px solid '+item.color+';"></div>'
-      +alertBadge+'</div></div></div>';
-    return html;
-  }
-  const html='<div style="width:140px;"><div style="display:flex;flex-direction:column;align-items:center;transform:scale('+(sel?1.1:1)+');transform-origin:50% 100%;transition:transform .15s ease;">'
-    +pinNameLabelHtml(item)
-    +'<div style="position:relative;width:36px;height:42px;filter:drop-shadow(0 6px 8px rgba(0,0,0,.45));">'
-    +'<svg width="36" height="42" viewBox="0 0 36 42"><path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z" fill="'+item.color+'${PIN_FILL_ALPHA}" stroke="'+(sel?'#ffffff':'${colors.background}')+'" stroke-width="'+(sel?2.5:1.5)+'"/></svg>'
-    +'<div style="position:absolute;top:9px;left:0;right:0;display:flex;justify-content:center;"><svg width="17" height="17" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="'+pinIconPaths.discoteca+'"/></svg></div>'
-    +alertBadge+'</div></div></div>';
-  return html;
-}
+const clusterTemplates=${toJsonForScript([1, ...CLUSTER_SIZE_THRESHOLDS].map((count) => clusterPinHtml(count, CLUSTER_COUNT_PLACEHOLDER)))};
 function clusterHtml(count){
-  const size=count<10?36:count<25?44:52;
-  const fontSize=count<10?12:count<25?13.5:15;
-  return '<div style="width:'+size+'px;height:'+size+'px;border-radius:50%;background:${colors.backgroundCard}F2;border:2.5px solid ${colors.brandPink};box-shadow:0 0 0 4px ${colors.brandPink}26,0 8px 18px rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;color:#fff;font-weight:${PIN_ACCENT_FONT_WEIGHT};font-size:'+fontSize+'px;font-family:${MAP_FONT_FAMILY};">'+count+'</div>';
-}
-function simplePointIcon(kind,fallbackEmoji){
-  const path=kind?pinIconPaths[kind]:undefined;
-  if(!path)return fallbackEmoji||'📍';
-  return '<svg width="16" height="16" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="'+path+'"/></svg>';
-}
-function simplePointHtml(kind,icon,color){
-  return '<div class="simple-point" style="background:'+((color||'${colors.backgroundCard}')+'${PIN_FILL_ALPHA}')+'">'+simplePointIcon(kind,icon)+'</div>';
+  const bucket=count<${CLUSTER_SIZE_THRESHOLDS[0]}?0:count<${CLUSTER_SIZE_THRESHOLDS[1]}?1:2;
+  return clusterTemplates[bucket].replace('${CLUSTER_COUNT_PLACEHOLDER}',count);
 }
 
 const map=new maplibregl.Map({container:'map',style:mapStyle,center:[${center.longitude},${center.latitude}],zoom:13});
@@ -133,9 +103,8 @@ function updateMarkers(items){
     if(existente&&existente.firma===firma)return;
     if(existente)existente.marker.remove();
     const el=document.createElement('div');
-    el.innerHTML=discotecaPinHtml(item);
+    el.innerHTML=item.html;
     const markerEl=el.firstElementChild;
-    markerEl.style.cursor='pointer';
     markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',id:item.id}));});
     const marker=new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([item.longitude,item.latitude]).addTo(map);
     markersById.set(item.id,{marker,firma});
@@ -145,6 +114,7 @@ function updateMarkers(items){
 window.updateMarkers=updateMarkers;
 
 let pointsById=new Map();
+let pointTemplates={};
 let routeStartMarker=null;
 
 map.on('load',()=>{
@@ -188,10 +158,10 @@ map.on('load',()=>{
       const point=pointsById.get(id);
       if(!point)return;
       const el=document.createElement('div');
-      el.innerHTML=simplePointHtml(point.kind,point.icon,point.color);
+      el.innerHTML=pointTemplates[point.pinKey];
       const markerEl=el.firstElementChild;
       markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:point.id}));});
-      const marker=new maplibregl.Marker({element:markerEl}).setLngLat([point.longitude,point.latitude]).addTo(map);
+      const marker=new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([point.longitude,point.latitude]).addTo(map);
       pointMarkers.set(id,marker);
     });
     pointMarkers.forEach((marker,id)=>{if(!seenPoints.has(id)){marker.remove();pointMarkers.delete(id);}});
@@ -199,7 +169,10 @@ map.on('load',()=>{
   map.on('data',renderPoints);
   map.on('move',renderPoints);
 
-  window.updatePoints=function(points){
+  window.updatePoints=function(points,templates){
+    pointTemplates=templates;
+    pointMarkers.forEach(marker=>marker.remove());
+    pointMarkers.clear();
     pointsById=new Map(points.map(p=>[p.id,p]));
     map.getSource('salimos-points').setData({type:'FeatureCollection',features:points.map(p=>({type:'Feature',properties:{id:p.id},geometry:{type:'Point',coordinates:[p.longitude,p.latitude]}}))});
   };
@@ -253,11 +226,13 @@ export function MapViewComponent({
     id: markerId(marker, index),
     latitude: marker.props.coordinate.latitude,
     longitude: marker.props.coordinate.longitude,
-    title: marker.props.title ?? 'Discoteca',
-    color: marker.props.discoteca?.color ?? '#ff4d4d',
-    selected: Boolean(marker.props.selected),
-    hasAlerts: Boolean(marker.props.hasAlerts),
-    eventImage: marker.props.eventImage ?? null,
+    html: discotecaPinHtml({
+      nombre: marker.props.title ?? 'Discoteca',
+      color: marker.props.discoteca?.color ?? CATEGORY_COLORS.discoteca,
+      selected: Boolean(marker.props.selected),
+      hasAlerts: Boolean(marker.props.hasAlerts),
+      eventImage: marker.props.eventImage,
+    }),
   }));
   const markersKey = JSON.stringify(markerData);
 
@@ -293,7 +268,10 @@ export function MapViewComponent({
 
   useEffect(() => {
     if (!mapReady) return;
-    webviewRef.current?.injectJavaScript(`window.updatePoints(${toJsonForScript(points)});true;`);
+    const { items, templates } = pointPinTemplates(points);
+    webviewRef.current?.injectJavaScript(
+      `window.updatePoints(${toJsonForScript(items)},${toJsonForScript(templates)});true;`,
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, points]);
 

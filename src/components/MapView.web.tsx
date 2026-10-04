@@ -7,18 +7,14 @@ import type {
   Point as GeoJSONPoint,
 } from 'geojson';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Discoteca } from '../types/discoteca';
 import { colors, BRAND_GRADIENT } from '../theme/colors';
+import { MAP_FONT_STYLESHEET_URL } from '../theme/mapPins';
+import { CATEGORY_COLORS } from '../theme/categoryColors';
 import {
-  MAP_FONT_FAMILY,
-  MAP_FONT_STYLESHEET_URL,
-  PIN_ACCENT_FONT_WEIGHT,
-  PIN_FILL_ALPHA,
-  PIN_ICON_COLOR,
-  PIN_ICON_DROP_SHADOW,
-  PIN_LABEL_FONT_WEIGHT,
-} from '../theme/mapPins';
-import { pinIconPath, PIN_ICON_VIEWBOX } from '../theme/mapPinIcons';
+  clusterPinHtml,
+  discotecaPinHtml,
+  pointPinHtml,
+} from '../theme/mapPinHtml';
 import {
   MarkerProps,
   MapViewProps,
@@ -49,171 +45,6 @@ if (typeof document !== 'undefined' && !document.getElementById('salimos-map-fon
   link.rel = 'stylesheet';
   link.href = MAP_FONT_STYLESHEET_URL;
   document.head.appendChild(link);
-}
-
-const DEFAULT_DISCOTECA_IMAGE =
-  'https://images.unsplash.com/photo-1566737236500-c8ac43014a67?w=400';
-
-/** Ancho del pin cuando muestra la foto del evento (grande, a su forma natural, sin redondear). */
-const EVENT_PIN_IMAGE_SIZE = 100;
-const EVENT_PIN_POINTER_HEIGHT = 10;
-
-/** Badge de alerta activa (estilo Waze), pegado a la esquina superior-izquierda del pin. */
-const ALERT_BADGE_HTML = `
-  <div style="
-    position: absolute;
-    top: -2px;
-    left: -4px;
-    width: 15px;
-    height: 15px;
-    border-radius: 50%;
-    background: ${colors.warning};
-    border: 2px solid ${colors.background};
-    box-shadow: 0 0 0 1px rgba(0,0,0,.35);
-  "></div>
-`;
-
-/** Etiqueta con el nombre, común a los dos diseños de pin. */
-function pinNameLabel(discoteca: Discoteca, selected: boolean) {
-  return `
-    <div style="
-      max-width: 132px;
-      background: ${colors.backgroundCard}F5;
-      border: 1px solid ${selected ? discoteca.color : colors.borderLight};
-      border-radius: 8px;
-      padding: 3px 8px;
-      margin-bottom: 3px;
-      box-shadow: 0 4px 10px rgba(0,0,0,.4)${selected ? `, 0 0 0 3px ${discoteca.color}40` : ''};
-    ">
-      <span style="
-        display: block;
-        color: #ffffff;
-        font-size: 10.5px;
-        font-weight: ${PIN_LABEL_FONT_WEIGHT};
-        letter-spacing: 0.4px;
-        text-transform: uppercase;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-family: ${MAP_FONT_FAMILY};
-      ">${discoteca.nombre}</span>
-    </div>
-  `;
-}
-
-/**
- * Pin de discoteca: si hay foto del evento del día, esa foto ES el pin (a su
- * forma natural, sin recortar ni redondear); si no, cae al diseño anterior
- * (inicial sobre el color de marca).
- *
- * El nodo raíz que devuelve esta función es el que se le pasa a
- * `maplibregl.Marker({element})`, y MapLibre reescribe su `transform` en
- * cada frame para seguir el mapa (`translate(...)`) — si ese mismo nodo
- * tuviera además una `transition: transform` propia (para el efecto de
- * "seleccionado"), el navegador intentaría animar también esos cambios de
- * posición, y el pin se quedaría a medio camino del mapa mientras arrastras
- * ("pilluqui"). Por eso el escalado va en un `<div>` interior aparte, nunca
- * en el nodo que MapLibre posiciona.
- */
-function discotecaMarkerHtml(
-  discoteca: Discoteca,
-  selected: boolean,
-  hasAlerts?: boolean,
-  eventImage?: string,
-) {
-  if (eventImage) {
-    const width = EVENT_PIN_IMAGE_SIZE;
-    const pointer = EVENT_PIN_POINTER_HEIGHT;
-    return `
-      <div style="width:140px;">
-        <div style="display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.06 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
-          ${pinNameLabel(discoteca, selected)}
-          <div style="position: relative; width: ${width}px; filter: drop-shadow(0 6px 10px rgba(0,0,0,.5));">
-            <img src="${eventImage}" style="
-              display: block;
-              width: ${width}px;
-              height: auto;
-              border: 3px solid ${selected ? '#ffffff' : discoteca.color};
-              box-sizing: border-box;
-            " />
-            <div style="
-              width: 0;
-              height: 0;
-              margin: 0 auto;
-              border-left: 8px solid transparent;
-              border-right: 8px solid transparent;
-              border-top: ${pointer}px solid ${discoteca.color};
-            "></div>
-            ${hasAlerts ? ALERT_BADGE_HTML : ''}
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
-  const discotecaIconPath = pinIconPath('discoteca');
-  return `
-    <div style="width:140px;">
-      <div style="display:flex; flex-direction:column; align-items:center; transform: scale(${selected ? 1.1 : 1}); transform-origin: 50% 100%; transition: transform .15s ease;">
-        ${pinNameLabel(discoteca, selected)}
-        <div style="position: relative; width: 36px; height: 42px; filter: drop-shadow(0 6px 8px rgba(0,0,0,.45));">
-          <svg width="36" height="42" viewBox="0 0 36 42">
-            <path d="M18,2 C25.7,2 32,8.3 32,16 C32,22.4 27,28.4 18,40 C9,28.4 4,22.4 4,16 C4,8.3 10.3,2 18,2 Z"
-              fill="${discoteca.color}${PIN_FILL_ALPHA}" stroke="${selected ? '#ffffff' : colors.background}" stroke-width="${selected ? 2.5 : 1.5}"/>
-          </svg>
-          <div style="position:absolute; top:9px; left:0; right:0; display:flex; justify-content:center;">
-            <svg width="17" height="17" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${discotecaIconPath}"/></svg>
-          </div>
-          ${hasAlerts ? ALERT_BADGE_HTML : ''}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-/** Icono de cluster (grupo de puntos comprimidos al alejar el mapa), con el acento de marca. */
-function clusterMarkerHtml(count: number) {
-  const size = count < 10 ? 36 : count < 25 ? 44 : 52;
-  const fontSize = count < 10 ? 12 : count < 25 ? 13.5 : 15;
-  return `<div style="
-    width: ${size}px;
-    height: ${size}px;
-    border-radius: 50%;
-    background: ${colors.backgroundCard}F2;
-    border: 2.5px solid ${colors.brandPink};
-    box-shadow: 0 0 0 4px ${colors.brandPink}26, 0 8px 18px rgba(0,0,0,.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #ffffff;
-    font-weight: ${PIN_ACCENT_FONT_WEIGHT};
-    font-size: ${fontSize}px;
-    font-family: ${MAP_FONT_FAMILY};
-    cursor: pointer;
-  ">${count}</div>`;
-}
-
-/** Ícono del pin: SVG de Material Symbols por categoría (`kind`); si no hay una conocida, cae al emoji. */
-function simplePointIcon(kind: string | undefined, fallbackEmoji: string) {
-  const path = pinIconPath(kind);
-  if (!path) return fallbackEmoji;
-  return `<svg width="16" height="16" viewBox="${PIN_ICON_VIEWBOX}" style="filter:${PIN_ICON_DROP_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${path}"/></svg>`;
-}
-
-function simplePointHtml(kind: string | undefined, icon: string, color?: string) {
-  return `<div style="
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    background: ${(color ?? colors.backgroundCard) + PIN_FILL_ALPHA};
-    border: 2.5px solid ${colors.background};
-    box-shadow: 0 0 0 1.5px rgba(255,255,255,0.55), 0 6px 14px rgba(0,0,0,.45);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    cursor: pointer;
-  ">${simplePointIcon(kind, icon)}</div>`;
 }
 
 const POINTS_SOURCE_ID = 'salimos-points';
@@ -270,9 +101,10 @@ function usePointsClusterLayer(
         const point = pointsById.get(id);
         if (!point) return;
         const el = document.createElement('div');
-        el.innerHTML = simplePointHtml(point.kind, point.icon ?? '📍', point.color);
+        el.innerHTML = pointPinHtml(point.kind, point.icon, point.color);
         const marker = new maplibregl.Marker({
           element: el.firstElementChild as HTMLElement,
+          anchor: 'bottom',
         })
           .setLngLat([point.longitude, point.latitude])
           .addTo(m);
@@ -331,7 +163,7 @@ function usePointsClusterLayer(
           let marker = clusterMarkers.get(clusterId);
           if (!marker) {
             const el = document.createElement('div');
-            el.innerHTML = clusterMarkerHtml(count);
+            el.innerHTML = clusterPinHtml(count);
             marker = new maplibregl.Marker({
               element: el.firstElementChild as HTMLElement,
             });
@@ -604,23 +436,17 @@ export function MapViewComponent({
       const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
         marker.props;
       const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
-      const color = discoteca?.color ?? '#ff4d4d';
-      const discotecaFallback: Discoteca = {
-        ...discoteca,
-        nombre,
-        color,
-        imagen: discoteca?.imagen ?? DEFAULT_DISCOTECA_IMAGE,
-      } as Discoteca;
+      const color = discoteca?.color ?? CATEGORY_COLORS.discoteca;
 
       const el = document.createElement('div');
-      el.innerHTML = discotecaMarkerHtml(
-        discoteca ?? discotecaFallback,
-        Boolean(selected),
-        Boolean(hasAlerts),
+      el.innerHTML = discotecaPinHtml({
+        nombre,
+        color,
+        selected: Boolean(selected),
+        hasAlerts: Boolean(hasAlerts),
         eventImage,
-      );
+      });
       const markerEl = el.firstElementChild as HTMLElement;
-      markerEl.style.cursor = 'pointer';
       markerEl.addEventListener('click', (event) => {
         event.stopPropagation();
         markerPressRef.current.get(id)?.();

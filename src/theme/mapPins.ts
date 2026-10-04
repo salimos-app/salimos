@@ -21,18 +21,3 @@ export const PIN_LABEL_FONT_WEIGHT = 600;
 /** Inicial del pin y contador de cluster — mismo peso que `heading`/`display`. */
 export const PIN_ACCENT_FONT_WEIGHT = 800;
 
-/**
- * Relleno de los pines de categoría (taxi/bar/pub/súper/discoteca): un poco
- * de transparencia (~88%) en vez de color sólido, para que no tapen del
- * todo el mapa debajo. Sufijo de alpha en hex, se concatena al color de la
- * categoría (`CATEGORY_COLORS`).
- */
-export const PIN_FILL_ALPHA = 'E0';
-
-/**
- * Contraste del ícono contra el relleno translúcido de la categoría:
- * blanco (funciona sobre cualquier color de la paleta) + una sombra sutil a
- * modo de trazo, en vez de un color de ícono distinto por categoría.
- */
-export const PIN_ICON_COLOR = '#ffffff';
-export const PIN_ICON_DROP_SHADOW = 'drop-shadow(0 1px 2px rgba(0,0,0,.55))';
