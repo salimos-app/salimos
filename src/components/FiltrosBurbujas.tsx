@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Text from './Text';
@@ -49,10 +49,10 @@ const LOGO_SIZE = HUB_SIZE;
 // Feedback táctil del hub al pulsarlo: encoge mientras se mantiene el dedo y
 // rebota al soltar (muelle). Sólo `transform` → corre en el hilo nativo
 // (useNativeDriver) y se siente instantáneo en móvil.
-const HUB_PRESS_SCALE = 0.86;
+const HUB_PRESS_SCALE = 0.7;
 const HUB_PRESS_IN_MS = 90;
 const HUB_PRESS_OUT_FRICTION = 4;
-const HUB_PRESS_OUT_TENSION = 160;
+const HUB_PRESS_OUT_TENSION = 100;
 
 // DEBUG: botones del desplegable (taxi/súper/bar/discoteca) — todo este
 // bloque sigue en iteración, ninguno de estos valores está cerrado todavía
@@ -104,6 +104,12 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
   const [abierto, setAbierto] = useState(false);
   const [progreso] = useState(() => new Animated.Value(0));
   const [hubEscala] = useState(() => new Animated.Value(1));
+  // Piso del rebote: si se suelta antes de que el hundimiento llegue a
+  // HUB_PRESS_SCALE (toque instantáneo), el rebote espera a que termine en
+  // vez de arrancar desde un valor intermedio — así el mínimo efecto es
+  // siempre el de un press completo.
+  const hubEncogidoListo = useRef(false);
+  const hubSueltoPendiente = useRef(false);
 
   useEffect(() => {
     onOpenChange?.(abierto);
@@ -134,22 +140,32 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
     });
   };
 
-  const handleHubPressIn = () => {
-    Animated.timing(hubEscala, {
-      toValue: HUB_PRESS_SCALE,
-      duration: HUB_PRESS_IN_MS,
-      easing: Easing.out(Easing.quad),
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const handleHubPressOut = () => {
+  const dispararReboteHub = () => {
     Animated.spring(hubEscala, {
       toValue: 1,
       friction: HUB_PRESS_OUT_FRICTION,
       tension: HUB_PRESS_OUT_TENSION,
       useNativeDriver: true,
     }).start();
+  };
+
+  const handleHubPressIn = () => {
+    hubEncogidoListo.current = false;
+    hubSueltoPendiente.current = false;
+    Animated.timing(hubEscala, {
+      toValue: HUB_PRESS_SCALE,
+      duration: HUB_PRESS_IN_MS,
+      easing: Easing.out(Easing.quad),
+      useNativeDriver: true,
+    }).start(({ finished }) => {
+      hubEncogidoListo.current = finished;
+      if (finished && hubSueltoPendiente.current) dispararReboteHub();
+    });
+  };
+
+  const handleHubPressOut = () => {
+    hubSueltoPendiente.current = true;
+    if (hubEncogidoListo.current) dispararReboteHub();
   };
 
   const handleBubblePress = (id: string) => {
