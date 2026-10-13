@@ -7,7 +7,7 @@ import { BlurView } from 'expo-blur';
 import { captureRef } from 'react-native-view-shot';
 import Text from './src/components/Text';
 import { colors } from './src/theme/colors';
-import { CATEGORY_COLORS } from './src/theme/categoryColors';
+import { CATEGORY_COLORS, CATEGORY_PIN_HIGHLIGHT } from './src/theme/categoryColors';
 import { FONTS_TO_LOAD } from './src/theme/typography';
 import { Discoteca, DiscotecaSinColor } from './src/types/discoteca';
 import { MapViewComponent, MarkerComponent, SimpleMapPoint } from './src/components/MapView';
@@ -62,10 +62,10 @@ type FiltroCategoria = 'discotecas' | 'bares' | 'supermercados' | 'taxis';
 // discoteca), que además va de los colores más cálidos/tarde a los más
 // fríos/noche de la paleta (ver CLAUDE.md → Decisiones de diseño).
 const FILTROS: FiltroOpcion[] = [
-  { id: 'taxis', icon: '🚕', iconKind: 'taxi', label: 'taxis', color: CATEGORY_COLORS.taxi },
-  { id: 'supermercados', icon: '🛒', iconKind: 'supermarket', label: 'supermercados', color: CATEGORY_COLORS.supermercado },
-  { id: 'bares', icon: '🍺', iconKind: 'bar', label: 'bares', color: CATEGORY_COLORS.bar },
-  { id: 'discotecas', icon: '🪩', iconKind: 'discoteca', label: 'discotecas', color: CATEGORY_COLORS.discoteca },
+  { id: 'taxis', icon: '🚕', iconKind: 'taxi', label: 'taxis', color: CATEGORY_COLORS.taxi, colorHighlight: CATEGORY_PIN_HIGHLIGHT.taxi },
+  { id: 'supermercados', icon: '🛒', iconKind: 'supermarket', label: 'supermercados', color: CATEGORY_COLORS.supermercado, colorHighlight: CATEGORY_PIN_HIGHLIGHT.supermercado },
+  { id: 'bares', icon: '🍺', iconKind: 'bar', label: 'bares', color: CATEGORY_COLORS.bar, colorHighlight: CATEGORY_PIN_HIGHLIGHT.bar },
+  { id: 'discotecas', icon: '🪩', iconKind: 'discoteca', label: 'discotecas', color: CATEGORY_COLORS.discoteca, colorHighlight: CATEGORY_PIN_HIGHLIGHT.discoteca },
 ];
 
 SplashScreen.preventAutoHideAsync();

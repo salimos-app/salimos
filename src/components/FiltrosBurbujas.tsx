@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
+import { LinearGradient } from 'expo-linear-gradient';
 import Text from './Text';
 import PinIcon from './PinIcon';
 import { colors } from '../theme/colors';
@@ -14,6 +15,8 @@ export interface FiltroOpcion {
   label: string;
   /** Color de acento del botón, a juego con los pines del mapa (`CATEGORY_COLORS`). */
   color: string;
+  /** Tono más cálido del degradado del botón (`CATEGORY_PIN_HIGHLIGHT`), a juego con el pin. */
+  colorHighlight: string;
 }
 
 interface Props {
@@ -61,6 +64,8 @@ const BUTTON_HEIGHT = 35;
 /** Ancho del contenedor de cada botón (fija dónde se alinean a la izquierda) y tope de ancho del botón mismo. */
 const BUTTON_MAX_WIDTH = 200;
 const BUTTON_BORDER_RADIUS = 5;
+/** Dónde el degradado llega al color de la categoría (0-1), igual que en los pines del mapa. */
+const BUTTON_GRADIENT_END = 0.6;
 const BUTTON_BORDER_WIDTH = 1.5;
 const BUTTON_PADDING_HORIZONTAL = 10;
 const BUTTON_ELEVATION = 4;
@@ -205,6 +210,13 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
                   onPress={() => handleBubblePress(opcion.id)}
                   style={[styles.boton, { backgroundColor: opcion.color }]}
                 >
+                  <LinearGradient
+                    colors={[opcion.colorHighlight, opcion.color]}
+                    locations={[0, BUTTON_GRADIENT_END]}
+                    start={{ x: 1, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={StyleSheet.absoluteFill}
+                  />
                   <PinIcon kind={opcion.iconKind} size={BUTTON_ICON_SIZE} color={BUTTON_ICON_COLOR} />
                   <Text variant="subheading" style={styles.botonLabel} numberOfLines={1}>
                     {opcion.label}
@@ -290,6 +302,7 @@ const styles = StyleSheet.create({
     borderRadius: BUTTON_BORDER_RADIUS,
     borderWidth: BUTTON_BORDER_WIDTH,
     borderColor: BUTTON_STROKE_COLOR,
+    overflow: 'hidden',
     flexDirection: 'row',
     alignItems: 'center',
     gap: BUTTON_ICON_LABEL_GAP,
