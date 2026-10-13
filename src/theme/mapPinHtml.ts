@@ -89,6 +89,8 @@ interface CategoryPinOptions {
   width: number;
   selected?: boolean;
   hasAlerts?: boolean;
+  /** Halo de neón del color de la categoría (solo discotecas; el resto va sin halo). */
+  glow?: boolean;
 }
 
 /**
@@ -102,20 +104,23 @@ function categoryPinBodyHtml({
   width,
   selected = false,
   hasAlerts = false,
+  glow: withGlow = false,
 }: CategoryPinOptions): string {
   const height = Math.round(width * PIN_ASPECT);
   const iconSize = Math.round(width * PIN_ICON_SCALE);
   // Un id por color: pines del mismo color comparten definición, así que
   // que el id se repita en el documento no cambia lo que se pinta.
   const gradientId = `salimos-pin-${color.replace('#', '')}`;
-  const glow = `drop-shadow(0 0 ${Math.round(width / 6)}px ${color}${selected ? PIN_GLOW_ALPHA_SELECTED : PIN_GLOW_ALPHA})`;
+  const glow = withGlow
+    ? `drop-shadow(0 0 ${Math.round(width / 6)}px ${color}${selected ? PIN_GLOW_ALPHA_SELECTED : PIN_GLOW_ALPHA}) `
+    : '';
   const path = pinIconPath(kind);
   const icon = path
     ? `<svg width="${iconSize}" height="${iconSize}" viewBox="${PIN_ICON_VIEWBOX}" style="display:block;filter:${PIN_ICON_SHADOW}"><path fill="${PIN_ICON_COLOR}" d="${path}"/></svg>`
     : `<span style="font-size:${Math.round(iconSize * 0.8)}px;line-height:1">${fallbackEmoji}</span>`;
 
   return (
-    `<div style="position:relative;width:${width}px;height:${height}px;filter:${glow} ${PIN_CONTACT_SHADOW};">` +
+    `<div style="position:relative;width:${width}px;height:${height}px;filter:${glow}${PIN_CONTACT_SHADOW};">` +
     `<svg width="${width}" height="${height}" viewBox="0 0 40 52" style="display:block;overflow:visible">` +
     `<defs><linearGradient id="${gradientId}" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${pinHighlight(color)}"/><stop offset=".6" stop-color="${color}"/></linearGradient></defs>` +
     `<path d="${PIN_SHAPE_PATH}" fill="url(#${gradientId})" stroke="#ffffff" stroke-opacity="${selected ? 1 : PIN_STROKE_OPACITY}" stroke-width="${selected ? PIN_STROKE_WIDTH_SELECTED : PIN_STROKE_WIDTH}"/>` +
@@ -149,7 +154,7 @@ function pinNameLabelHtml(
   selected: boolean,
 ): string {
   return (
-    `<div style="max-width:132px;background:${colors.backgroundCard}F5;border:1px solid ${selected ? color : colors.borderLight};border-radius:8px;padding:3px 8px;margin-bottom:4px;box-shadow:0 4px 10px rgba(0,0,0,.4)${selected ? `, 0 0 0 3px ${color}40` : ''};">` +
+    `<div style="max-width:132px;background:${colors.backgroundCard}F5;border:1px solid ${selected ? color : colors.borderLight};border-radius:8px;padding:1px 6px;margin-bottom:3px;box-shadow:0 4px 10px rgba(0,0,0,.4)${selected ? `, 0 0 0 3px ${color}40` : ''};">` +
     `<span style="display:block;color:#ffffff;font-size:10.5px;font-weight:${PIN_LABEL_FONT_WEIGHT};letter-spacing:.4px;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:${MAP_FONT_FAMILY};">${nombre}</span>` +
     `</div>`
   );
@@ -197,6 +202,7 @@ export function discotecaPinHtml({
         color,
         kind: 'discoteca',
         width: DISCOTECA_PIN_WIDTH,
+        glow: true,
         selected,
         hasAlerts,
       });
