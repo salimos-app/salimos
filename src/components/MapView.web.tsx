@@ -15,12 +15,7 @@ import {
   discotecaPinHtml,
   pointPinHtml,
 } from '../theme/mapPinHtml';
-import {
-  MarkerProps,
-  MapViewProps,
-  SimpleMapPoint,
-  mapStyle,
-} from './MapView.types';
+import { MarkerProps, MapViewProps, mapStyle } from './MapView.types';
 
 // MapLibre intenta detectar la URL de su propio <script> para relanzarse a sí
 // mismo como worker; bajo Metro (el bundler de Expo web) todo el código de la
@@ -39,7 +34,10 @@ maplibregl.setWorkerUrl('/maplibre-gl-csp-worker.js');
 // Los pines son DOM plano fuera del árbol de React Native (MapLibre los
 // posiciona a mano), así que no heredan las fuentes que registra
 // `expo-font` para el resto de la app: se cargan una única vez, aparte.
-if (typeof document !== 'undefined' && !document.getElementById('salimos-map-font')) {
+if (
+  typeof document !== 'undefined' &&
+  !document.getElementById('salimos-map-font')
+) {
   const link = document.createElement('link');
   link.id = 'salimos-map-font';
   link.rel = 'stylesheet';
@@ -50,74 +48,179 @@ if (typeof document !== 'undefined' && !document.getElementById('salimos-map-fon
 const POINTS_SOURCE_ID = 'salimos-points';
 const POINTS_CLUSTER_LAYER_ID = 'salimos-points-clusters';
 
-/** Registra (o repone) la fuente GeoJSON + capa de clusters nativos de MapLibre para `points`. */
-function usePointsClusterLayer(
-  map: maplibregl.Map | null,
-  points: SimpleMapPoint[],
-  onPointPress?: (point: SimpleMapPoint) => void,
-) {
-  const markersRef = React.useRef<Map<string, maplibregl.Marker>>(new Map());
-  const onPointPressRef = React.useRef(onPointPress);
-  onPointPressRef.current = onPointPress;
+/** Un pin del mapa (punto de categoría o discoteca) tal como lo ve el clustering. */
+interface MapItem {
+  /** Único entre todos los pines (puntos y discotecas comparten el mismo clustering). */
+  id: string;
+  longitude: number;
+  latitude: number;
+  html: string;
+  /** Si entra al clustering; si no (p.ej. la discoteca seleccionada) se pinta siempre. */
+  clustered: boolean;
+  onPress: () => void;
+}
+
+/**
+ * Pinta los pines del mapa con un único clustering para todos (puntos y
+ * discotecas): fuente GeoJSON + clusters nativos de MapLibre, con los
+ * marcadores HTML individuales y los de cluster sincronizados a mano.
+ *
+ * Los cambios de `items` se aplican con `setData` y un diff por marcador
+ * (solo se recrea el DOM del pin cuyo HTML cambió): recrearlos todos hacía
+ * que el mapa parpadeara cada vez que llegaba una foto de evento, que
+ * llegan de una en una.
+ */
+function useClusteredMarkers(map: maplibregl.Map | null, items: MapItem[]) {
+  const itemsRef = React.useRef(items);
+  itemsRef.current = items;
+  const syncRef = React.useRef<(() => void) | null>(null);
+  const itemsKey = items
+    .map((i) => `${i.id}|${i.latitude}|${i.longitude}|${i.clustered}|${i.html}`)
+    .join('\n');
 
   React.useEffect(() => {
     if (!map) return;
     const m = map;
 
-    const geojson: FeatureCollection<GeoJSONPoint> = {
-      type: 'FeatureCollection',
-      features: points.map((point): Feature<GeoJSONPoint> => ({
-        type: 'Feature',
-        properties: { id: point.id },
-        geometry: {
-          type: 'Point',
-          coordinates: [point.longitude, point.latitude],
-        },
-      })),
-    };
+    const individual = new Map<
+      string,
+      { marker: maplibregl.Marker; html: string }
+    >();
+    const standalone = new Map<
+      string,
+      { marker: maplibregl.Marker; html: string }
+    >();
+    const clusterMarkers = new Map<number, maplibregl.Marker>();
 
-    const pointsById = new Map(points.map((point) => [point.id, point]));
+    function createMarker(item: MapItem) {
+      const el = document.createElement('div');
+      el.innerHTML = item.html;
+      const markerEl = el.firstElementChild as HTMLElement;
+      markerEl.addEventListener('click', (event) => {
+        event.stopPropagation();
+        itemsRef.current.find((i) => i.id === item.id)?.onPress();
+      });
+      return new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
+        .setLngLat([item.longitude, item.latitude])
+        .addTo(m);
+    }
 
-    function clearIndividualMarkers() {
-      markersRef.current.forEach((marker) => marker.remove());
-      markersRef.current.clear();
+    function geojson(): FeatureCollection<GeoJSONPoint> {
+      return {
+        type: 'FeatureCollection',
+        features: itemsRef.current
+          .filter((item) => item.clustered)
+          .map((item): Feature<GeoJSONPoint> => ({
+            type: 'Feature',
+            properties: { id: item.id },
+            geometry: {
+              type: 'Point',
+              coordinates: [item.longitude, item.latitude],
+            },
+          })),
+      };
     }
 
     // Diferencial (igual que los clusters): solo se crean los pines que
-    // aparecen y se quitan los que dejan de estar. Recrearlos todos aquí
-    // hacía que arrastrar el mapa destruyera y reconstruyera el DOM de cada
-    // pin en cada frame del gesto, y se veía a tirones.
+    // aparecen y se quitan los que dejan de estar.
     function renderIndividualMarkers() {
       if (!m.getSource(POINTS_SOURCE_ID)) return;
+      const byId = new Map(itemsRef.current.map((i) => [i.id, i]));
       const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
         filter: ['!', ['has', 'point_count']],
       });
       const seen = new Set<string>();
       features.forEach((feature: maplibregl.MapGeoJSONFeature) => {
         const id = feature.properties?.id as string | undefined;
-        if (!id || seen.has(id)) return;
+        const item = id ? byId.get(id) : undefined;
+        if (!id || !item || !item.clustered || seen.has(id)) return;
         seen.add(id);
-        if (markersRef.current.has(id)) return;
-        const point = pointsById.get(id);
-        if (!point) return;
-        const el = document.createElement('div');
-        el.innerHTML = pointPinHtml(point.kind, point.icon, point.color);
-        const marker = new maplibregl.Marker({
-          element: el.firstElementChild as HTMLElement,
-          anchor: 'bottom',
-        })
-          .setLngLat([point.longitude, point.latitude])
-          .addTo(m);
-        el.firstElementChild?.addEventListener('click', (event) => {
-          event.stopPropagation();
-          onPointPressRef.current?.(point);
-        });
-        markersRef.current.set(id, marker);
+        const existing = individual.get(id);
+        if (existing?.html === item.html) return;
+        existing?.marker.remove();
+        individual.set(id, { marker: createMarker(item), html: item.html });
       });
-      markersRef.current.forEach((marker, id) => {
+      individual.forEach((entry, id) => {
         if (!seen.has(id)) {
+          entry.marker.remove();
+          individual.delete(id);
+        }
+      });
+    }
+
+    function renderClusters() {
+      if (!m.getSource(POINTS_SOURCE_ID)) return;
+      const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
+        filter: ['has', 'point_count'],
+      });
+      const seenIds = new Set<number>();
+      features.forEach((feature: maplibregl.MapGeoJSONFeature) => {
+        const clusterId = feature.properties?.cluster_id as number;
+        const count = feature.properties?.point_count as number;
+        if (clusterId == null || seenIds.has(clusterId)) return;
+        seenIds.add(clusterId);
+        const coords = (feature.geometry as GeoJSONPoint).coordinates as [
+          number,
+          number,
+        ];
+        let marker = clusterMarkers.get(clusterId);
+        if (!marker) {
+          const el = document.createElement('div');
+          el.innerHTML = clusterPinHtml(count);
+          marker = new maplibregl.Marker({
+            element: el.firstElementChild as HTMLElement,
+          });
+          el.firstElementChild?.addEventListener('click', () => {
+            const source = m.getSource(
+              POINTS_SOURCE_ID,
+            ) as maplibregl.GeoJSONSource;
+            source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
+              m.easeTo({ center: coords, zoom });
+            });
+          });
+          clusterMarkers.set(clusterId, marker);
+        }
+        marker.setLngLat(coords).addTo(m);
+      });
+      clusterMarkers.forEach((marker, id) => {
+        if (!seenIds.has(id)) {
           marker.remove();
-          markersRef.current.delete(id);
+          clusterMarkers.delete(id);
+        }
+      });
+    }
+
+    function renderAll() {
+      renderClusters();
+      renderIndividualMarkers();
+    }
+
+    // Los pines fuera del clustering (la discoteca seleccionada) se pintan
+    // siempre, sin pasar por la fuente.
+    function syncStandalone() {
+      const loose = itemsRef.current.filter((i) => !i.clustered);
+      const ids = new Set(loose.map((i) => i.id));
+      loose.forEach((item) => {
+        const existing = standalone.get(item.id);
+        if (existing?.html === item.html) return;
+        existing?.marker.remove();
+        standalone.set(item.id, {
+          marker: createMarker(item),
+          html: item.html,
+        });
+      });
+      standalone.forEach((entry, id) => {
+        if (!ids.has(id)) {
+          entry.marker.remove();
+          standalone.delete(id);
+        }
+      });
+      // Un pin que acaba de salir del clustering no debe quedar duplicado
+      // hasta que la fuente emita su próximo evento.
+      individual.forEach((entry, id) => {
+        if (ids.has(id)) {
+          entry.marker.remove();
+          individual.delete(id);
         }
       });
     }
@@ -129,12 +232,11 @@ function usePointsClusterLayer(
 
       m.addSource(POINTS_SOURCE_ID, {
         type: 'geojson',
-        data: geojson,
+        data: geojson(),
         cluster: true,
         clusterMaxZoom: 16,
         clusterRadius: 56,
       });
-
       m.addLayer({
         id: POINTS_CLUSTER_LAYER_ID,
         type: 'symbol',
@@ -143,64 +245,25 @@ function usePointsClusterLayer(
         layout: { 'icon-allow-overlap': true },
       });
 
-      // Los clusters se dibujan como HTML markers (mismo estilo que antes con leaflet.markercluster).
-      const clusterMarkers = new Map<number, maplibregl.Marker>();
-      function renderClusters() {
-        if (!m.getSource(POINTS_SOURCE_ID)) return;
-        const features = m.querySourceFeatures(POINTS_SOURCE_ID, {
-          filter: ['has', 'point_count'],
-        });
-        const seenIds = new Set<number>();
-        features.forEach((feature: maplibregl.MapGeoJSONFeature) => {
-          const clusterId = feature.properties?.cluster_id as number;
-          const count = feature.properties?.point_count as number;
-          if (clusterId == null || seenIds.has(clusterId)) return;
-          seenIds.add(clusterId);
-          const coords = (feature.geometry as GeoJSONPoint).coordinates as [
-            number,
-            number,
-          ];
-          let marker = clusterMarkers.get(clusterId);
-          if (!marker) {
-            const el = document.createElement('div');
-            el.innerHTML = clusterPinHtml(count);
-            marker = new maplibregl.Marker({
-              element: el.firstElementChild as HTMLElement,
-            });
-            el.firstElementChild?.addEventListener('click', () => {
-              const source = m.getSource(
-                POINTS_SOURCE_ID,
-              ) as maplibregl.GeoJSONSource;
-              source.getClusterExpansionZoom(clusterId).then((zoom: number) => {
-                m.easeTo({ center: coords, zoom });
-              });
-            });
-            clusterMarkers.set(clusterId, marker);
-          }
-          marker.setLngLat(coords).addTo(m);
-        });
-        clusterMarkers.forEach((marker, id) => {
-          if (!seenIds.has(id)) {
-            marker.remove();
-            clusterMarkers.delete(id);
-          }
-        });
-      }
-
-      function renderAll() {
-        renderClusters();
-        renderIndividualMarkers();
-      }
-
       m.on('data', renderAll);
       m.on('move', renderAll);
+      syncRef.current = () => {
+        (
+          m.getSource(POINTS_SOURCE_ID) as maplibregl.GeoJSONSource | undefined
+        )?.setData(geojson());
+        syncStandalone();
+        renderAll();
+      };
+      syncStandalone();
       renderAll();
 
       return () => {
+        syncRef.current = null;
         m.off('data', renderAll);
         m.off('move', renderAll);
         clusterMarkers.forEach((marker) => marker.remove());
-        clearIndividualMarkers();
+        individual.forEach((entry) => entry.marker.remove());
+        standalone.forEach((entry) => entry.marker.remove());
         if (m.getLayer(POINTS_CLUSTER_LAYER_ID))
           m.removeLayer(POINTS_CLUSTER_LAYER_ID);
         if (m.getSource(POINTS_SOURCE_ID)) m.removeSource(POINTS_SOURCE_ID);
@@ -217,7 +280,11 @@ function usePointsClusterLayer(
       m.off('load', onLoad);
       cleanup?.();
     };
-  }, [map, points]);
+  }, [map]);
+
+  React.useEffect(() => {
+    syncRef.current?.();
+  }, [map, itemsKey]);
 }
 
 const ROUTE_SOURCE_ID = 'salimos-route';
@@ -336,10 +403,6 @@ export function MapViewComponent({
   const center = region || initialRegion;
   const onPressRef = React.useRef(onPress);
   onPressRef.current = onPress;
-  const discotecaMarkersRef = React.useRef<
-    Map<string, { marker: maplibregl.Marker; firma: string }>
-  >(new Map());
-
   const markers = React.Children.toArray(children).filter((child) => {
     if (!React.isValidElement(child)) return false;
     const props = child.props as Partial<MarkerProps>;
@@ -354,41 +417,44 @@ export function MapViewComponent({
     return marker.props.discoteca?.slug ?? marker.props.title ?? String(index);
   }
 
-  // Firma serializable de lo que se ve de cada marcador (sin `children`/`onPress`,
-  // que no son serializables y con `children` en concreto rompían el
-  // `JSON.stringify` al incluir un elemento React con referencias circulares).
-  // Se compara por marcador: si un pin no cambia, no se toca su DOM.
-  const markerSignatures = new Map(
-    markers.map((marker, index) => {
-      const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
-        marker.props;
-      return [
-        markerId(marker, index),
-        JSON.stringify({
-          lat: coordinate.latitude,
-          lng: coordinate.longitude,
-          slug: discoteca?.slug,
-          title,
-          color: discoteca?.color,
-          selected,
-          hasAlerts,
-          eventImage,
-        }),
-      ] as const;
-    }),
-  );
-  const markersKey = [...markerSignatures.values()].join('|');
+  const onPointPressRef = React.useRef(onPointPress);
+  onPointPressRef.current = onPointPress;
 
-  // El handler de cada pin se lee siempre por referencia: así un marcador que
-  // no ha cambiado visualmente puede seguir vivo sin quedarse con un closure
-  // viejo.
-  const markerPressRef = React.useRef<Map<string, () => void>>(new Map());
-  markerPressRef.current = new Map(
-    markers.map((marker, index) => [
-      markerId(marker, index),
-      () => marker.props.onPress?.(),
-    ]),
+  // El HTML de los puntos solo depende de `points`: se calcula aparte para no
+  // regenerarlo en cada render del mapa.
+  const pointItems = React.useMemo<MapItem[]>(
+    () =>
+      points.map((point) => ({
+        id: `point:${point.id}`,
+        longitude: point.longitude,
+        latitude: point.latitude,
+        html: pointPinHtml(point.kind, point.icon, point.color),
+        clustered: true,
+        onPress: () => onPointPressRef.current?.(point),
+      })),
+    [points],
   );
+
+  // Discotecas: entran al mismo clustering que los puntos, salvo la
+  // seleccionada, que se queda siempre a la vista.
+  const discotecaItems: MapItem[] = markers.map((marker, index) => {
+    const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
+      marker.props;
+    return {
+      id: `discoteca:${markerId(marker, index)}`,
+      longitude: coordinate.longitude,
+      latitude: coordinate.latitude,
+      html: discotecaPinHtml({
+        nombre: discoteca?.nombre ?? title ?? 'Discoteca',
+        color: discoteca?.color ?? CATEGORY_COLORS.discoteca,
+        selected: Boolean(selected),
+        hasAlerts: Boolean(hasAlerts),
+        eventImage,
+      }),
+      clustered: !selected,
+      onPress: () => marker.props.onPress?.(),
+    };
+  });
 
   React.useEffect(() => {
     if (!containerRef.current) return;
@@ -414,69 +480,8 @@ export function MapViewComponent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  usePointsClusterLayer(map, points, onPointPress);
+  useClusteredMarkers(map, [...pointItems, ...discotecaItems]);
   useRouteLayer(map, routeCoordinates);
-
-  // Marcadores de discotecas: se actualizan uno a uno. Solo se recrea el DOM
-  // del pin cuya firma cambió (p.ej. le llegó la foto del evento o se
-  // seleccionó); el resto se queda tal cual. Recrearlos todos hacía que el
-  // mapa parpadeara cada vez que entraba una foto, que llegan de una en una.
-  React.useEffect(() => {
-    if (!map) return;
-    const m = map;
-    const vivos = discotecaMarkersRef.current;
-
-    markers.forEach((marker, index) => {
-      const id = markerId(marker, index);
-      const firma = markerSignatures.get(id) ?? '';
-      const existente = vivos.get(id);
-      if (existente?.firma === firma) return;
-      existente?.marker.remove();
-
-      const { coordinate, discoteca, title, selected, hasAlerts, eventImage } =
-        marker.props;
-      const nombre = discoteca?.nombre ?? title ?? 'Discoteca';
-      const color = discoteca?.color ?? CATEGORY_COLORS.discoteca;
-
-      const el = document.createElement('div');
-      el.innerHTML = discotecaPinHtml({
-        nombre,
-        color,
-        selected: Boolean(selected),
-        hasAlerts: Boolean(hasAlerts),
-        eventImage,
-      });
-      const markerEl = el.firstElementChild as HTMLElement;
-      markerEl.addEventListener('click', (event) => {
-        event.stopPropagation();
-        markerPressRef.current.get(id)?.();
-      });
-
-      vivos.set(id, {
-        firma,
-        marker: new maplibregl.Marker({ element: markerEl, anchor: 'bottom' })
-          .setLngLat([coordinate.longitude, coordinate.latitude])
-          .addTo(m),
-      });
-    });
-
-    vivos.forEach((entrada, id) => {
-      if (!markerSignatures.has(id)) {
-        entrada.marker.remove();
-        vivos.delete(id);
-      }
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, markersKey]);
-
-  // Al desmontar (o cambiar de mapa) se limpian todos de una vez.
-  React.useEffect(() => {
-    const vivos = discotecaMarkersRef.current;
-    return () => {
-      vivos.forEach((entrada) => entrada.marker.remove());
-      vivos.clear();
-    };
-  }, [map]);
 
   return (
     <View style={[styles.webMap, style]}>

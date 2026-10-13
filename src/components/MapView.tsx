@@ -21,28 +21,42 @@ function markerId(marker: React.ReactElement<MarkerProps>, index: number): strin
   return marker.props.discoteca?.slug ?? marker.props.title ?? String(index);
 }
 
-interface MarkerDatum {
+/**
+ * Pin tal como lo recibe el WebView (puntos y discotecas comparten el mismo
+ * clustering). El HTML va ya construido (`mapPinHtml.ts`): inline en las
+ * discotecas, y por plantilla (`tpl`) en los puntos, que comparten HTML por
+ * categoría y así se manda una sola vez.
+ */
+interface MapItem {
   id: string;
+  /** Mensaje que vuelve a RN al tocarlo (`marker` = discoteca, `point` = punto) y su id original. */
+  press: 'marker' | 'point';
+  ref: string;
   latitude: number;
   longitude: number;
-  /** HTML del pin ya construido (`mapPinHtml.ts`): el WebView solo lo inserta. */
-  html: string;
+  /** Si entra al clustering; si no (la discoteca seleccionada) se pinta siempre. */
+  clustered: boolean;
+  html?: string;
+  tpl?: string;
 }
 
 /** Marcador de posición del número dentro de las plantillas de cluster. */
 const CLUSTER_COUNT_PLACEHOLDER = '{{count}}';
 
-/**
- * Plantillas del pin de punto, deduplicadas: los puntos de una misma
- * categoría comparten HTML, así que se manda una vez por categoría y cada
- * punto solo lleva su clave.
- */
-function pointPinTemplates(points: SimpleMapPoint[]) {
+function pointItemsWithTemplates(points: SimpleMapPoint[]) {
   const templates: Record<string, string> = {};
-  const items = points.map((point) => {
-    const pinKey = `${point.kind ?? ''}|${point.icon ?? ''}|${point.color ?? ''}`;
-    templates[pinKey] ??= pointPinHtml(point.kind, point.icon, point.color);
-    return { ...point, pinKey };
+  const items = points.map((point): MapItem => {
+    const tpl = `${point.kind ?? ''}|${point.icon ?? ''}|${point.color ?? ''}`;
+    templates[tpl] ??= pointPinHtml(point.kind, point.icon, point.color);
+    return {
+      id: `point:${point.id}`,
+      press: 'point',
+      ref: point.id,
+      latitude: point.latitude,
+      longitude: point.longitude,
+      clustered: true,
+      tpl,
+    };
   });
   return { items, templates };
 }
@@ -51,7 +65,7 @@ function pointPinTemplates(points: SimpleMapPoint[]) {
  * HTML/JS de MapLibre GL, construido UNA SOLA VEZ por montaje (ver
  * `useMemo` más abajo). Los datos (marcadores, puntos, ruta) no se
  * embeben aquí: llegan después vía `injectJavaScript`, a través de
- * `window.updateMarkers/updatePoints/updateRoute`. Antes esta función se
+ * `window.updateItems/updateRoute`. Antes esta función se
  * reconstruía en cada render con los datos embebidos y se pasaba como
  * `source={{html}}` nuevo cada vez, lo que forzaba a WebView a recargar
  * la página entera (reinicializar MapLibre, redescargar tiles, recrear
@@ -88,34 +102,22 @@ const map=new maplibregl.Map({container:'map',style:mapStyle,center:[${center.lo
 map.addControl(new maplibregl.NavigationControl({showCompass:false}),'top-right');
 map.on('click',(e)=>window.ReactNativeWebView.postMessage(JSON.stringify({type:'map',lat:e.lngLat.lat,lng:e.lngLat.lng})));
 
-// Marcadores de discotecas: se actualizan uno a uno por id (comparando una
-// "firma" serializada de lo que se ve de cada uno). Solo se recrea el DOM
-// del pin cuyo aspecto cambió — el resto se queda tal cual, así que un
-// evento de alertas o una foto que llega no reconstruye pines que no
-// cambiaron.
-const markersById=new Map();
-function updateMarkers(items){
-  const seen=new Set();
-  items.forEach(item=>{
-    seen.add(item.id);
-    const firma=JSON.stringify(item);
-    const existente=markersById.get(item.id);
-    if(existente&&existente.firma===firma)return;
-    if(existente)existente.marker.remove();
-    const el=document.createElement('div');
-    el.innerHTML=item.html;
-    const markerEl=el.firstElementChild;
-    markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'marker',id:item.id}));});
-    const marker=new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([item.longitude,item.latitude]).addTo(map);
-    markersById.set(item.id,{marker,firma});
-  });
-  markersById.forEach((entrada,id)=>{if(!seen.has(id)){entrada.marker.remove();markersById.delete(id);}});
-}
-window.updateMarkers=updateMarkers;
-
-let pointsById=new Map();
-let pointTemplates={};
+// Pines (puntos y discotecas) con un único clustering. Cada item trae su HTML
+// (inline o por plantilla deduplicada: \`tpl\`) y si entra al clustering
+// (\`clustered\`; la discoteca seleccionada no, se pinta siempre). Los cambios
+// se aplican con diff por marcador: solo se recrea el DOM del pin cuyo HTML
+// cambió, así que una foto o alerta que llega no reconstruye el resto.
+let itemsById=new Map();
+let templates={};
 let routeStartMarker=null;
+function itemHtml(item){return item.html||templates[item.tpl];}
+function buildMarker(item){
+  const el=document.createElement('div');
+  el.innerHTML=itemHtml(item);
+  const markerEl=el.firstElementChild;
+  markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:item.press,id:item.ref}));});
+  return new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([item.longitude,item.latitude]).addTo(map);
+}
 
 map.on('load',()=>{
   map.addSource('salimos-points',{type:'geojson',cluster:true,clusterMaxZoom:16,clusterRadius:56,data:{type:'FeatureCollection',features:[]}});
@@ -123,6 +125,7 @@ map.on('load',()=>{
 
   const clusterMarkers=new Map();
   const pointMarkers=new Map();
+  const standalone=new Map();
   function renderPoints(){
     const clusterFeatures=map.querySourceFeatures('salimos-points',{filter:['has','point_count']});
     const seenClusters=new Set();
@@ -152,29 +155,37 @@ map.on('load',()=>{
     const seenPoints=new Set();
     singleFeatures.forEach(f=>{
       const id=f.properties.id;
-      if(seenPoints.has(id))return;
+      const item=itemsById.get(id);
+      if(!item||!item.clustered||seenPoints.has(id))return;
       seenPoints.add(id);
-      if(pointMarkers.has(id))return;
-      const point=pointsById.get(id);
-      if(!point)return;
-      const el=document.createElement('div');
-      el.innerHTML=pointTemplates[point.pinKey];
-      const markerEl=el.firstElementChild;
-      markerEl.addEventListener('click',(ev)=>{ev.stopPropagation();window.ReactNativeWebView.postMessage(JSON.stringify({type:'point',id:point.id}));});
-      const marker=new maplibregl.Marker({element:markerEl,anchor:'bottom'}).setLngLat([point.longitude,point.latitude]).addTo(map);
-      pointMarkers.set(id,marker);
+      const existente=pointMarkers.get(id);
+      const html=itemHtml(item);
+      if(existente&&existente.html===html)return;
+      if(existente)existente.marker.remove();
+      pointMarkers.set(id,{marker:buildMarker(item),html});
     });
-    pointMarkers.forEach((marker,id)=>{if(!seenPoints.has(id)){marker.remove();pointMarkers.delete(id);}});
+    pointMarkers.forEach((entrada,id)=>{if(!seenPoints.has(id)){entrada.marker.remove();pointMarkers.delete(id);}});
   }
   map.on('data',renderPoints);
   map.on('move',renderPoints);
 
-  window.updatePoints=function(points,templates){
-    pointTemplates=templates;
-    pointMarkers.forEach(marker=>marker.remove());
-    pointMarkers.clear();
-    pointsById=new Map(points.map(p=>[p.id,p]));
-    map.getSource('salimos-points').setData({type:'FeatureCollection',features:points.map(p=>({type:'Feature',properties:{id:p.id},geometry:{type:'Point',coordinates:[p.longitude,p.latitude]}}))});
+  window.updateItems=function(items,tpls){
+    templates=tpls;
+    itemsById=new Map(items.map(i=>[i.id,i]));
+    map.getSource('salimos-points').setData({type:'FeatureCollection',features:items.filter(i=>i.clustered).map(i=>({type:'Feature',properties:{id:i.id},geometry:{type:'Point',coordinates:[i.longitude,i.latitude]}}))});
+    const loose=items.filter(i=>!i.clustered);
+    const looseIds=new Set(loose.map(i=>i.id));
+    loose.forEach(item=>{
+      const existente=standalone.get(item.id);
+      const html=itemHtml(item);
+      if(existente&&existente.html===html)return;
+      if(existente)existente.marker.remove();
+      standalone.set(item.id,{marker:buildMarker(item),html});
+    });
+    standalone.forEach((entrada,id)=>{if(!looseIds.has(id)){entrada.marker.remove();standalone.delete(id);}});
+    // Un pin que acaba de salir del clustering no debe quedar duplicado hasta el próximo evento de la fuente.
+    pointMarkers.forEach((entrada,id)=>{if(looseIds.has(id)){entrada.marker.remove();pointMarkers.delete(id);}});
+    renderPoints();
   };
 
   window.updateRoute=function(route){
@@ -222,19 +233,28 @@ export function MapViewComponent({
       Boolean((child as React.ReactElement<MarkerProps>).props.coordinate),
   );
 
-  const markerData: MarkerDatum[] = markers.map((marker, index) => ({
-    id: markerId(marker, index),
-    latitude: marker.props.coordinate.latitude,
-    longitude: marker.props.coordinate.longitude,
-    html: discotecaPinHtml({
-      nombre: marker.props.title ?? 'Discoteca',
-      color: marker.props.discoteca?.color ?? CATEGORY_COLORS.discoteca,
-      selected: Boolean(marker.props.selected),
-      hasAlerts: Boolean(marker.props.hasAlerts),
-      eventImage: marker.props.eventImage,
+  // Los puntos solo cambian cuando cambia `points`: su HTML (plantillas) se
+  // calcula aparte para no regenerarlo en cada render.
+  const pointData = useMemo(() => pointItemsWithTemplates(points), [points]);
+
+  const discotecaItems = markers.map(
+    (marker, index): MapItem => ({
+      id: `discoteca:${markerId(marker, index)}`,
+      press: 'marker',
+      ref: markerId(marker, index),
+      latitude: marker.props.coordinate.latitude,
+      longitude: marker.props.coordinate.longitude,
+      clustered: !marker.props.selected,
+      html: discotecaPinHtml({
+        nombre: marker.props.title ?? 'Discoteca',
+        color: marker.props.discoteca?.color ?? CATEGORY_COLORS.discoteca,
+        selected: Boolean(marker.props.selected),
+        hasAlerts: Boolean(marker.props.hasAlerts),
+        eventImage: marker.props.eventImage,
+      }),
     }),
-  }));
-  const markersKey = JSON.stringify(markerData);
+  );
+  const itemsKey = JSON.stringify(discotecaItems);
 
   // El handler de cada pin se lee siempre por referencia (vía este mapa), no
   // por índice: así identificar el marcador por `id` en el mensaje del
@@ -262,18 +282,11 @@ export function MapViewComponent({
 
   useEffect(() => {
     if (!mapReady) return;
-    webviewRef.current?.injectJavaScript(`window.updateMarkers(${toJsonForScript(markerData)});true;`);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, markersKey]);
-
-  useEffect(() => {
-    if (!mapReady) return;
-    const { items, templates } = pointPinTemplates(points);
     webviewRef.current?.injectJavaScript(
-      `window.updatePoints(${toJsonForScript(items)},${toJsonForScript(templates)});true;`,
+      `window.updateItems(${toJsonForScript([...pointData.items, ...discotecaItems])},${toJsonForScript(pointData.templates)});true;`,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mapReady, points]);
+  }, [mapReady, pointData, itemsKey]);
 
   useEffect(() => {
     if (!mapReady) return;
