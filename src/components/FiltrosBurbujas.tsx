@@ -215,12 +215,13 @@ export default function FiltrosBurbujas({ opciones, onSelect, onCollapse, onOpen
                     locations={[0, BUTTON_GRADIENT_END]}
                     start={{ x: 1, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={StyleSheet.absoluteFill}
-                  />
-                  <PinIcon kind={opcion.iconKind} size={BUTTON_ICON_SIZE} color={BUTTON_ICON_COLOR} />
-                  <Text variant="subheading" style={styles.botonLabel} numberOfLines={1}>
-                    {opcion.label}
-                  </Text>
+                    style={styles.botonContenido}
+                  >
+                    <PinIcon kind={opcion.iconKind} size={BUTTON_ICON_SIZE} color={BUTTON_ICON_COLOR} />
+                    <Text variant="subheading" style={styles.botonLabel} numberOfLines={1}>
+                      {opcion.label}
+                    </Text>
+                  </LinearGradient>
                 </Pressable>
               </Animated.View>
             );
@@ -298,14 +299,10 @@ const styles = StyleSheet.create({
   boton: {
     height: BUTTON_HEIGHT,
     maxWidth: BUTTON_MAX_WIDTH,
-    paddingHorizontal: BUTTON_PADDING_HORIZONTAL,
     borderRadius: BUTTON_BORDER_RADIUS,
     borderWidth: BUTTON_BORDER_WIDTH,
     borderColor: BUTTON_STROKE_COLOR,
     overflow: 'hidden',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: BUTTON_ICON_LABEL_GAP,
     elevation: BUTTON_ELEVATION,
     // DEBUG: sombra propia del botón — comentada por ahora, descomentar para probarla.
     // shadowColor: BUTTON_SHADOW_COLOR,
@@ -316,6 +313,15 @@ const styles = StyleSheet.create({
     // outlineWidth: BUTTON_OUTLINE_WIDTH,
     // outlineColor: BUTTON_STROKE_COLOR,
     // outlineStyle: 'solid',
+  },
+  // El degradado es el contenedor del contenido (no una capa absoluta hermana):
+  // en web una capa absoluta se pinta por encima de los íconos SVG y los tapa.
+  botonContenido: {
+    height: '100%',
+    paddingHorizontal: BUTTON_PADDING_HORIZONTAL,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: BUTTON_ICON_LABEL_GAP,
   },
   botonLabel: {
     color: '#ffffff',
