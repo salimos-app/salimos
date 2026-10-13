@@ -48,6 +48,6 @@ Color fijo por categoría (`src/theme/categoryColors.ts`): taxi `#febd2a`, super
 
 Orden del desplegable del hub, de abajo hacia arriba: taxi → súper → bar → discoteca. Representa el orden cronológico de una salida (taxi, comprar consumibles, tardeo, discoteca) y correlaciona con la paleta de cálido/tarde a frío/noche.
 
-`[DRAFT]` Pines del mapa (`src/theme/mapPinHtml.ts`): un único tipo, en punta (silueta del isotipo). Relleno opaco con degradado del color de categoría hacia su tono vecino más cálido (`CATEGORY_PIN_HIGHLIGHT`), trazo blanco, ícono blanco (Material Symbols Rounded). Halo de neón solo en discotecas. Discotecas más grandes que el resto.
+Pines del mapa (`src/theme/mapPinHtml.ts`): un único tipo, en punta (silueta del isotipo). Relleno opaco con degradado del color de categoría hacia su tono vecino más cálido (`CATEGORY_PIN_HIGHLIGHT`), trazo blanco, ícono blanco (Material Symbols Rounded). Halo de neón solo en discotecas. Discotecas más grandes que el resto.
 
-`[DRAFT]` Botones del hub: rectangulares (no circulares), ícono + label dentro. Mismo tratamiento visual que los pines: relleno opaco con el mismo degradado, trazo blanco, ícono blanco. Discoteca usa el ícono `discoteca.svg` (no la inicial del nombre) tanto en el pin como en el hub.
+Botones del hub: rectangulares (no circulares), ícono + label dentro. Mismo tratamiento visual que los pines: relleno opaco con el mismo degradado, trazo blanco, ícono blanco. Discoteca usa el ícono `discoteca.svg` (no la inicial del nombre) tanto en el pin como en el hub.

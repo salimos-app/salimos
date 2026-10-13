@@ -20,14 +20,11 @@ import { PIN_ICON_VIEWBOX, pinIconPath } from './mapPinIcons';
  * Ancho del pin en punta (el alto sale de la proporción de la forma). Las
  * discotecas van un poco más grandes: son el destino principal de la app.
  */
-// DEBUG
 export const POINT_PIN_WIDTH = 38;
-// DEBUG
 export const DISCOTECA_PIN_WIDTH = 44;
 /** Alto / ancho de la forma del pin (viewBox 40×52). */
 const PIN_ASPECT = 52 / 40;
 /** Tamaño del ícono relativo al ancho del pin. */
-// DEBUG
 const PIN_ICON_SCALE = 0.52;
 const PIN_ICON_COLOR = '#ffffff';
 const PIN_ICON_SHADOW = 'drop-shadow(0 1px 1.5px rgba(0,0,0,.4))';
@@ -40,9 +37,7 @@ const PIN_SHAPE_PATH =
   'M20 1.5C30.2 1.5 38.5 9.8 38.5 20c0 9.6-7.4 17.6-15.6 28.6a3.6 3.6 0 0 1-5.8 0C8.9 37.6 1.5 29.6 1.5 20 1.5 9.8 9.8 1.5 20 1.5Z';
 
 /** Trazo blanco alrededor del pin: lo despega del mapa oscuro. */
-// DEBUG
 const PIN_STROKE_OPACITY = 0.9;
-// DEBUG
 const PIN_STROKE_WIDTH = 2;
 const PIN_STROKE_WIDTH_SELECTED = 3;
 
@@ -51,7 +46,6 @@ const PIN_STROKE_WIDTH_SELECTED = 3;
  * sombra de contacto oscura. El halo es lo que hace que el pin se lea
  * "vivo/flúor" sobre el mapa oscuro en vez de apagado.
  */
-// DEBUG
 const PIN_GLOW_ALPHA = 'B3';
 const PIN_GLOW_ALPHA_SELECTED = 'FF';
 const PIN_CONTACT_SHADOW = 'drop-shadow(0 3px 4px rgba(0,0,0,.55))';
